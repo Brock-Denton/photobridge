@@ -402,18 +402,8 @@
 				DEVELOPMENT_TEAM = FAS9V6M3AJ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "PhotoBridge deletes photos after moving them (they remain in Recently Deleted)";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "PhotoBridge needs access to your photos to move them to Google Drive";
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "com.googleusercontent.apps.74309569492-ebossfoerkapvf1ikhajn6pclaf1qlvl";
-						CFBundleURLSchemes = (
-							"com.googleusercontent.apps.74309569492-ebossfoerkapvf1ikhajn6pclaf1qlvl",
-							"com.photobridge.app"
-						);
-					}
-				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PhotoBridge/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -452,18 +442,8 @@
 				DEVELOPMENT_TEAM = FAS9V6M3AJ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "PhotoBridge deletes photos after moving them (they remain in Recently Deleted)";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "PhotoBridge needs access to your photos to move them to Google Drive";
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "com.googleusercontent.apps.74309569492-ebossfoerkapvf1ikhajn6pclaf1qlvl";
-						CFBundleURLSchemes = (
-							"com.googleusercontent.apps.74309569492-ebossfoerkapvf1ikhajn6pclaf1qlvl",
-							"com.photobridge.app"
-						);
-					}
-				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PhotoBridge/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -497,7 +477,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FAS9V6M3AJ;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PhotoBridge/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;
@@ -520,7 +501,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FAS9V6M3AJ;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PhotoBridge/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;
@@ -542,7 +524,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FAS9V6M3AJ;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PhotoBridge/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;
@@ -564,7 +547,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FAS9V6M3AJ;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PhotoBridge/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;

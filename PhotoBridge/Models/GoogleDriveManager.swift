@@ -71,41 +71,62 @@ class GoogleDriveManager: ObservableObject {
     }
     
     func authenticate() async {
+        print("Starting Google authentication...")
+        
         guard let presentingViewController = topViewController() else {
-            print("No presenting view controller found")
+            print("ERROR: No presenting view controller found")
             return
         }
+        
+        print("Found presenting view controller:", presentingViewController)
         
         let config = GIDConfiguration(clientID: GoogleAPIConfig.clientId)
         GIDSignIn.sharedInstance.configuration = config
         
+        print("Configured GIDSignIn with client ID:", GoogleAPIConfig.clientId)
+        
         do {
+            print("Calling GIDSignIn.sharedInstance.signIn...")
             let result = try await GIDSignIn.sharedInstance.signIn(
                 withPresenting: presentingViewController,
                 hint: nil,
                 additionalScopes: GoogleAPIConfig.scopes
             )
             
-            print("Signed in as:", result.user.profile?.email ?? "")
+            print("Sign-in successful!")
+            print("Signed in as:", result.user.profile?.email ?? "Unknown email")
             isAuthenticated = true
             await loadFolders()
             
         } catch {
-            print("Sign-in failed:", error)
+            print("Sign-in failed with error:", error)
+            print("Error details:", error.localizedDescription)
             isAuthenticated = false
         }
     }
     
     private func topViewController() -> UIViewController? {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else {
+        print("Looking for top view controller...")
+        
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            print("No window scene found")
+            return nil
+        }
+        
+        guard let window = windowScene.windows.first else {
+            print("No window found")
             return nil
         }
         
         var topController = window.rootViewController
+        print("Root view controller:", topController)
+        
         while let presentedViewController = topController?.presentedViewController {
             topController = presentedViewController
+            print("Presented view controller:", presentedViewController)
         }
+        
+        print("Final top view controller:", topController)
         return topController
     }
     
