@@ -10,6 +10,11 @@ import GoogleSignIn
 
 @main
 struct PhotoBridgeApp: App {
+    init() {
+        // Configure Google Sign-In
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: GoogleAPIConfig.clientId)
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
