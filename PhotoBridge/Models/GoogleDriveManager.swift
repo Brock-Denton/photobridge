@@ -183,9 +183,12 @@ class GoogleDriveManager: ObservableObject {
             
             // Add root folder
             let rootFolder = GoogleDriveFolder(id: "root", name: "My Drive", parentId: nil)
-            folders = [rootFolder] + driveFolders
             
-            print("✅ Total folders loaded: \(folders.count)")
+            await MainActor.run {
+                self.folders = [rootFolder] + driveFolders
+                print("✅ Total folders loaded: \(self.folders.count)")
+                print("📋 Folder names: \(self.folders.map { $0.name })")
+            }
             
             loadLastUsedFolder()
             

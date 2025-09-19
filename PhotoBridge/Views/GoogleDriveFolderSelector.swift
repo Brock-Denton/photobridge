@@ -71,7 +71,13 @@ struct FolderPickerView: View {
     
     var body: some View {
         NavigationView {
-            List(driveManager.folders) { folder in
+            VStack {
+                Text("Debug: \(driveManager.folders.count) folders")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding()
+                
+                List(driveManager.folders) { folder in
                 Button(action: {
                     driveManager.selectFolder(folder)
                     dismiss()
@@ -99,6 +105,7 @@ struct FolderPickerView: View {
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
+                }
             }
             .navigationTitle("Select Folder")
             .navigationBarTitleDisplayMode(.inline)
