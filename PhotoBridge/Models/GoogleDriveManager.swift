@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-struct GoogleDriveFolder: Identifiable, Hashable {
+struct GoogleDriveFolder: Identifiable, Hashable, Codable {
     let id: String
     let name: String
     let parentId: String?
@@ -22,6 +22,20 @@ struct UploadResult {
     let success: Bool
     let fileName: String
     let error: Error?
+    let fileId: String?
+}
+
+struct DriveFile: Codable {
+    let id: String
+    let name: String
+    let mimeType: String
+    let size: String?
+    let parents: [String]?
+}
+
+struct DriveFileList: Codable {
+    let files: [DriveFile]
+    let nextPageToken: String?
 }
 
 @MainActor
@@ -32,23 +46,25 @@ class GoogleDriveManager: ObservableObject {
     @Published var uploadProgress: [String: Double] = [:]
     @Published var isUploading = false
     
-    private let accessTokenKey = "google_drive_access_token"
-    private let refreshTokenKey = "google_drive_refresh_token"
+    private let authManager = GoogleAuthManager()
     private let lastFolderKey = "last_used_folder_id"
     
-    private let clientId = "YOUR_GOOGLE_CLIENT_ID" // Replace with actual client ID
-    private let clientSecret = "YOUR_GOOGLE_CLIENT_SECRET" // Replace with actual client secret
-    private let redirectURI = "com.photobridge.app://oauth"
-    
     init() {
-        checkAuthenticationStatus()
+        setupAuthObserver()
         loadLastUsedFolder()
     }
     
-    private func checkAuthenticationStatus() {
-        if let _ = UserDefaults.standard.string(forKey: accessTokenKey) {
-            isAuthenticated = true
-            loadFolders()
+    private func setupAuthObserver() {
+        Task { @MainActor in
+            for await _ in NotificationCenter.default.notifications(named: .authStatusChanged) {
+                isAuthenticated = authManager.isAuthenticated
+                if isAuthenticated {
+                    await loadFolders()
+                } else {
+                    folders = []
+                    selectedFolder = nil
+                }
+            }
         }
     }
     
@@ -60,36 +76,53 @@ class GoogleDriveManager: ObservableObject {
     }
     
     func authenticate() async {
-        // For demo purposes, we'll simulate authentication
-        // In a real app, you'd implement OAuth2 flow with Google APIs
-        await simulateAuthentication()
-    }
-    
-    private func simulateAuthentication() async {
-        // Simulate network delay
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        
-        // Store fake tokens
-        UserDefaults.standard.set("fake_access_token", forKey: accessTokenKey)
-        UserDefaults.standard.set("fake_refresh_token", forKey: refreshTokenKey)
-        
-        isAuthenticated = true
-        await loadFolders()
+        do {
+            try await authManager.startAuthentication()
+            isAuthenticated = authManager.isAuthenticated
+            if isAuthenticated {
+                await loadFolders()
+            }
+        } catch {
+            print("Authentication failed: \(error)")
+        }
     }
     
     func loadFolders() async {
-        // Simulate loading folders from Google Drive API
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        guard let accessToken = authManager.accessToken else { return }
         
-        let mockFolders = [
-            GoogleDriveFolder(id: "root", name: "My Drive", parentId: nil),
-            GoogleDriveFolder(id: "photos", name: "Photos", parentId: "root"),
-            GoogleDriveFolder(id: "backup", name: "Backup", parentId: "root"),
-            GoogleDriveFolder(id: "archive", name: "Archive", parentId: "root")
+        var components = URLComponents(string: "\(GoogleAPIConfig.driveAPIBase)/files")!
+        components.queryItems = [
+            URLQueryItem(name: "q", value: "mimeType='application/vnd.google-apps.folder' and trashed=false"),
+            URLQueryItem(name: "fields", value: "files(id,name,parents)"),
+            URLQueryItem(name: "orderBy", value: "name")
         ]
         
-        folders = mockFolders
-        loadLastUsedFolder()
+        guard let url = components.url else { return }
+        
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            let response = try JSONDecoder().decode(DriveFileList.self, from: data)
+            
+            let driveFolders = response.files.map { file in
+                GoogleDriveFolder(
+                    id: file.id,
+                    name: file.name,
+                    parentId: file.parents?.first
+                )
+            }
+            
+            // Add root folder
+            let rootFolder = GoogleDriveFolder(id: "root", name: "My Drive", parentId: nil)
+            folders = [rootFolder] + driveFolders
+            
+            loadLastUsedFolder()
+            
+        } catch {
+            print("Failed to load folders: \(error)")
+        }
     }
     
     func selectFolder(_ folder: GoogleDriveFolder) {
@@ -98,50 +131,128 @@ class GoogleDriveManager: ObservableObject {
     }
     
     func uploadFile(data: Data, fileName: String) async -> UploadResult {
-        guard let folder = selectedFolder else {
-            return UploadResult(success: false, fileName: fileName, error: NSError(domain: "NoFolderSelected", code: 0))
+        guard let folder = selectedFolder,
+              let accessToken = authManager.accessToken else {
+            return UploadResult(success: false, fileName: fileName, error: NSError(domain: "NoFolderSelected", code: 0), fileId: nil)
         }
         
-        // Simulate upload progress
         uploadProgress[fileName] = 0.0
         isUploading = true
         
-        // Simulate upload process
-        for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-            uploadProgress[fileName] = progress
-        }
-        
-        // Simulate occasional failures (5% chance)
-        let success = Double.random(in: 0...1) > 0.05
-        
-        uploadProgress.removeValue(forKey: fileName)
-        isUploading = uploadProgress.isEmpty
-        
-        if success {
-            return UploadResult(success: true, fileName: fileName, error: nil)
-        } else {
-            return UploadResult(success: false, fileName: fileName, error: NSError(domain: "UploadFailed", code: 1))
+        do {
+            // Create file metadata
+            let metadata = [
+                "name": fileName,
+                "parents": [folder.id]
+            ]
+            
+            let metadataData = try JSONSerialization.data(withJSONObject: metadata)
+            
+            // Create multipart upload
+            let boundary = "Boundary-\(UUID().uuidString)"
+            var body = Data()
+            
+            // Add metadata part
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
+            body.append(metadataData)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            // Add file data part
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+            body.append(data)
+            body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+            
+            // Create upload URL
+            var components = URLComponents(string: "\(GoogleAPIConfig.uploadAPIBase)/files")!
+            components.queryItems = [
+                URLQueryItem(name: "uploadType", value: "multipart"),
+                URLQueryItem(name: "fields", value: "id,name")
+            ]
+            
+            guard let url = components.url else {
+                throw NSError(domain: "InvalidURL", code: -1)
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("multipart/related; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
+            
+            // Simulate progress updates
+            let progressTask = Task {
+                for progress in stride(from: 0.1, through: 0.9, by: 0.1) {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    await MainActor.run {
+                        uploadProgress[fileName] = progress
+                    }
+                }
+            }
+            
+            let (responseData, response) = try await URLSession.shared.data(for: request)
+            progressTask.cancel()
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                throw NSError(domain: "UploadFailed", code: (response as? HTTPURLResponse)?.statusCode ?? -1)
+            }
+            
+            let uploadedFile = try JSONDecoder().decode(DriveFile.self, from: responseData)
+            
+            await MainActor.run {
+                uploadProgress[fileName] = 1.0
+                uploadProgress.removeValue(forKey: fileName)
+                isUploading = uploadProgress.isEmpty
+            }
+            
+            return UploadResult(success: true, fileName: fileName, error: nil, fileId: uploadedFile.id)
+            
+        } catch {
+            await MainActor.run {
+                uploadProgress.removeValue(forKey: fileName)
+                isUploading = uploadProgress.isEmpty
+            }
+            
+            return UploadResult(success: false, fileName: fileName, error: error, fileId: nil)
         }
     }
     
-    func verifyUpload(fileName: String) async -> Bool {
-        // Simulate verification process
-        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+    func verifyUpload(fileName: String, fileId: String) async -> Bool {
+        guard let accessToken = authManager.accessToken else { return false }
         
-        // Simulate occasional verification failures (2% chance)
-        return Double.random(in: 0...1) > 0.02
+        var components = URLComponents(string: "\(GoogleAPIConfig.driveAPIBase)/files/\(fileId)")!
+        components.queryItems = [
+            URLQueryItem(name: "fields", value: "id,name,size")
+        ]
+        
+        guard let url = components.url else { return false }
+        
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { return false }
+            return httpResponse.statusCode == 200
+        } catch {
+            print("Verification failed: \(error)")
+            return false
+        }
     }
     
     func signOut() {
-        UserDefaults.standard.removeObject(forKey: accessTokenKey)
-        UserDefaults.standard.removeObject(forKey: refreshTokenKey)
-        UserDefaults.standard.removeObject(forKey: lastFolderKey)
-        
+        authManager.signOut()
         isAuthenticated = false
         folders = []
         selectedFolder = nil
         uploadProgress = [:]
         isUploading = false
+        UserDefaults.standard.removeObject(forKey: lastFolderKey)
     }
+}
+
+extension Notification.Name {
+    static let authStatusChanged = Notification.Name("authStatusChanged")
 }

@@ -99,7 +99,7 @@ struct UploadProgressView: View {
             for asset in selectedAssets {
                 do {
                     guard let data = await photoManager.getAssetData(for: asset) else {
-                        let result = UploadResult(success: false, fileName: photoManager.getAssetFileName(for: asset), error: NSError(domain: "NoData", code: 0))
+                        let result = UploadResult(success: false, fileName: photoManager.getAssetFileName(for: asset), error: NSError(domain: "NoData", code: 0), fileId: nil)
                         await MainActor.run {
                             uploadResults.append(result)
                             allSuccessful = false
@@ -118,12 +118,12 @@ struct UploadProgressView: View {
                     }
                     
                     // Verify upload
-                    if uploadResult.success {
-                        let verified = await driveManager.verifyUpload(fileName: fileName)
+                    if uploadResult.success, let fileId = uploadResult.fileId {
+                        let verified = await driveManager.verifyUpload(fileName: fileName, fileId: fileId)
                         if !verified {
                             await MainActor.run {
                                 if let index = uploadResults.firstIndex(where: { $0.fileName == fileName }) {
-                                    uploadResults[index] = UploadResult(success: false, fileName: fileName, error: NSError(domain: "VerificationFailed", code: 1))
+                                    uploadResults[index] = UploadResult(success: false, fileName: fileName, error: NSError(domain: "VerificationFailed", code: 1), fileId: fileId)
                                     allSuccessful = false
                                 }
                             }
@@ -131,7 +131,7 @@ struct UploadProgressView: View {
                     }
                     
                 } catch {
-                    let result = UploadResult(success: false, fileName: photoManager.getAssetFileName(for: asset), error: error)
+                    let result = UploadResult(success: false, fileName: photoManager.getAssetFileName(for: asset), error: error, fileId: nil)
                     await MainActor.run {
                         uploadResults.append(result)
                         allSuccessful = false
