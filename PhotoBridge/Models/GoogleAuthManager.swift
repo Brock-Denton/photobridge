@@ -36,6 +36,9 @@ class GoogleAuthManager: ObservableObject {
     private var codeVerifier: String?
     private var codeChallenge: String?
     
+    // Keep strong reference to presentation context provider
+    private var presentationContextProvider: AuthPresentationContextProvider?
+    
     init() {
         loadStoredTokens()
     }
@@ -86,7 +89,8 @@ class GoogleAuthManager: ObservableObject {
             }
         }
         
-        session.presentationContextProvider = AuthPresentationContextProvider()
+        presentationContextProvider = AuthPresentationContextProvider()
+        session.presentationContextProvider = presentationContextProvider
         session.start()
     }
     

@@ -97,44 +97,35 @@ struct UploadProgressView: View {
             
             // Upload each file
             for asset in selectedAssets {
-                do {
-                    guard let data = await photoManager.getAssetData(for: asset) else {
-                        let result = UploadResult(success: false, fileName: photoManager.getAssetFileName(for: asset), error: NSError(domain: "NoData", code: 0), fileId: nil)
-                        await MainActor.run {
-                            uploadResults.append(result)
-                            allSuccessful = false
-                        }
-                        continue
-                    }
-                    
-                    let fileName = photoManager.getAssetFileName(for: asset)
-                    let uploadResult = await driveManager.uploadFile(data: data, fileName: fileName)
-                    
-                    await MainActor.run {
-                        uploadResults.append(uploadResult)
-                        if !uploadResult.success {
-                            allSuccessful = false
-                        }
-                    }
-                    
-                    // Verify upload
-                    if uploadResult.success, let fileId = uploadResult.fileId {
-                        let verified = await driveManager.verifyUpload(fileName: fileName, fileId: fileId)
-                        if !verified {
-                            await MainActor.run {
-                                if let index = uploadResults.firstIndex(where: { $0.fileName == fileName }) {
-                                    uploadResults[index] = UploadResult(success: false, fileName: fileName, error: NSError(domain: "VerificationFailed", code: 1), fileId: fileId)
-                                    allSuccessful = false
-                                }
-                            }
-                        }
-                    }
-                    
-                } catch {
-                    let result = UploadResult(success: false, fileName: photoManager.getAssetFileName(for: asset), error: error, fileId: nil)
+                guard let data = await photoManager.getAssetData(for: asset) else {
+                    let result = UploadResult(success: false, fileName: photoManager.getAssetFileName(for: asset), error: NSError(domain: "NoData", code: 0), fileId: nil)
                     await MainActor.run {
                         uploadResults.append(result)
                         allSuccessful = false
+                    }
+                    continue
+                }
+                
+                let fileName = photoManager.getAssetFileName(for: asset)
+                let uploadResult = await driveManager.uploadFile(data: data, fileName: fileName)
+                
+                await MainActor.run {
+                    uploadResults.append(uploadResult)
+                    if !uploadResult.success {
+                        allSuccessful = false
+                    }
+                }
+                
+                // Verify upload
+                if uploadResult.success, let fileId = uploadResult.fileId {
+                    let verified = await driveManager.verifyUpload(fileName: fileName, fileId: fileId)
+                    if !verified {
+                        await MainActor.run {
+                            if let index = uploadResults.firstIndex(where: { $0.fileName == fileName }) {
+                                uploadResults[index] = UploadResult(success: false, fileName: fileName, error: NSError(domain: "VerificationFailed", code: 1), fileId: fileId)
+                                allSuccessful = false
+                            }
+                        }
                     }
                 }
             }
