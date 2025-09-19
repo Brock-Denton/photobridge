@@ -118,10 +118,9 @@ Edit `PhotoBridge/Models/GoogleAPIConfig.swift` and replace:
 
 ```swift
 static let clientId = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
-static let clientSecret = "YOUR_GOOGLE_CLIENT_SECRET"
 ```
 
-With your actual credentials from the Google Cloud Console.
+With your actual client ID from the Google Cloud Console. **No client secret needed** - the app uses PKCE (Proof Key for Code Exchange) for secure authentication without requiring a client secret.
 
 #### 3. Update Bundle Identifier (Optional)
 

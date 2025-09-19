@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import AuthenticationServices
+import CryptoKit
 
 struct AuthTokenResponse: Codable {
     let access_token: String
@@ -31,6 +32,10 @@ class GoogleAuthManager: ObservableObject {
     private let refreshTokenKey = "google_drive_refresh_token"
     private let tokenExpiryKey = "google_drive_token_expiry"
     
+    // PKCE parameters
+    private var codeVerifier: String?
+    private var codeChallenge: String?
+    
     init() {
         loadStoredTokens()
     }
@@ -52,7 +57,10 @@ class GoogleAuthManager: ObservableObject {
     }
     
     func startAuthentication() async throws {
-        guard let authURL = URL(string: GoogleAPIConfig.authURLString) else {
+        // Generate PKCE parameters
+        generatePKCEParameters()
+        
+        guard let authURL = URL(string: generateAuthURL()) else {
             throw AuthError(message: "Invalid auth URL", code: -1)
         }
         
@@ -82,8 +90,40 @@ class GoogleAuthManager: ObservableObject {
         session.start()
     }
     
+    private func generatePKCEParameters() {
+        // Generate code verifier (43-128 characters, URL-safe)
+        let characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+        codeVerifier = String((0..<128).map { _ in characters.randomElement()! })
+        
+        // Generate code challenge (SHA256 hash of code verifier, base64url encoded)
+        if let verifier = codeVerifier,
+           let data = verifier.data(using: .utf8) {
+            let hash = SHA256.hash(data: data)
+            codeChallenge = Data(hash).base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+        }
+    }
+    
+    private func generateAuthURL() -> String {
+        var components = URLComponents(string: GoogleAPIConfig.authURL)!
+        components.queryItems = [
+            URLQueryItem(name: "client_id", value: GoogleAPIConfig.clientId),
+            URLQueryItem(name: "redirect_uri", value: GoogleAPIConfig.redirectURI),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: GoogleAPIConfig.scopeString),
+            URLQueryItem(name: "access_type", value: "offline"),
+            URLQueryItem(name: "prompt", value: "consent"),
+            URLQueryItem(name: "code_challenge", value: codeChallenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256")
+        ]
+        return components.url!.absoluteString
+    }
+    
     private func exchangeCodeForToken(code: String) async {
-        guard let tokenURL = URL(string: GoogleAPIConfig.tokenURL) else { return }
+        guard let tokenURL = URL(string: GoogleAPIConfig.tokenURL),
+              let codeVerifier = codeVerifier else { return }
         
         var request = URLRequest(url: tokenURL)
         request.httpMethod = "POST"
@@ -91,10 +131,10 @@ class GoogleAuthManager: ObservableObject {
         
         let bodyParams = [
             "client_id": GoogleAPIConfig.clientId,
-            "client_secret": GoogleAPIConfig.clientSecret,
             "code": code,
             "grant_type": "authorization_code",
-            "redirect_uri": GoogleAPIConfig.redirectURI
+            "redirect_uri": GoogleAPIConfig.redirectURI,
+            "code_verifier": codeVerifier
         ]
         
         request.httpBody = bodyParams.map { "\($0.key)=\($0.value)" }.joined(separator: "&").data(using: .utf8)
@@ -133,7 +173,6 @@ class GoogleAuthManager: ObservableObject {
         
         let bodyParams = [
             "client_id": GoogleAPIConfig.clientId,
-            "client_secret": GoogleAPIConfig.clientSecret,
             "refresh_token": refreshToken,
             "grant_type": "refresh_token"
         ]
