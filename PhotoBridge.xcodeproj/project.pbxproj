@@ -30,7 +30,6 @@
 		334EA82D2E7DCEF700899F17 /* PhotoBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhotoBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		334EA83E2E7DCEF900899F17 /* PhotoBridgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoBridgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		334EA8482E7DCEF900899F17 /* PhotoBridgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoBridgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		334EA8612E7DD5F200899F17 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -83,7 +82,6 @@
 				334EA8412E7DCEF900899F17 /* PhotoBridgeTests */,
 				334EA84B2E7DCEF900899F17 /* PhotoBridgeUITests */,
 				334EA82E2E7DCEF700899F17 /* Products */,
-				334EA8612E7DD5F200899F17 /* .gitignore */,
 			);
 			sourceTree = "<group>";
 		};
