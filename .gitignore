@@ -1,0 +1,15 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserdatad
+*.xccheckout
+*.xcscmblueprint
+xcuserdata/
+
+# SwiftPM
+.swiftpm/
+.build/
+
+# CocoaPods (if you ever use it)
+Pods/
+*.xcworkspace

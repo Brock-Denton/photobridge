@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		334EA8632E7DD5FC00899F17 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 334EA8612E7DD5F200899F17 /* .gitignore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		334EA83F2E7DCEF900899F17 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		334EA82D2E7DCEF700899F17 /* PhotoBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhotoBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		334EA83E2E7DCEF900899F17 /* PhotoBridgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoBridgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		334EA8482E7DCEF900899F17 /* PhotoBridgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotoBridgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		334EA8612E7DD5F200899F17 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -79,6 +84,7 @@
 				334EA8412E7DCEF900899F17 /* PhotoBridgeTests */,
 				334EA84B2E7DCEF900899F17 /* PhotoBridgeUITests */,
 				334EA82E2E7DCEF700899F17 /* Products */,
+				334EA8612E7DD5F200899F17 /* .gitignore */,
 			);
 			sourceTree = "<group>";
 		};
@@ -212,6 +218,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				334EA8632E7DD5FC00899F17 /* .gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
