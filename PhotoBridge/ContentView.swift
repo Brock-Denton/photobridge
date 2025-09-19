@@ -8,14 +8,57 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var photoManager = PhotoLibraryManager()
+    @StateObject private var driveManager = GoogleDriveManager()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        NavigationView {
+            VStack(spacing: 0) {
+                // Header
+                VStack(spacing: 16) {
+                    HStack {
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                        
+                        Text("PhotoBridge")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        Spacer()
+                        
+                        if driveManager.isAuthenticated {
+                            Button("Sign Out") {
+                                driveManager.signOut()
+                            }
+                            .font(.caption)
+                        }
+                    }
+                    
+                    GoogleDriveFolderSelector(driveManager: driveManager)
+                }
+                .padding()
+                .background(Color(.systemBackground))
+                
+                Divider()
+                
+                // Main content
+                if photoManager.authorizationStatus == .authorized || photoManager.authorizationStatus == .limited {
+                    PhotoGridView(photoManager: photoManager)
+                } else {
+                    Spacer()
+                }
+                
+                Divider()
+                
+                // Upload controls
+                UploadProgressView(driveManager: driveManager, photoManager: photoManager)
+                    .padding()
+                    .background(Color(.systemBackground))
+            }
+            .navigationBarHidden(true)
         }
-        .padding()
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }
 
