@@ -141,7 +141,7 @@ class GoogleDriveManager: ObservableObject {
         
         do {
             // Create file metadata
-            let metadata = [
+            let metadata: [String: Any] = [
                 "name": fileName,
                 "parents": [folder.id]
             ]
