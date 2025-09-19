@@ -274,29 +274,6 @@ class GoogleDriveManager: ObservableObject {
         }
     }
     
-    func verifyUpload(fileName: String, fileId: String) async -> Bool {
-        guard let accessToken = await getAccessToken() else { return false }
-        
-        var components = URLComponents(string: "\(GoogleAPIConfig.driveAPIBase)/files/\(fileId)")!
-        components.queryItems = [
-            URLQueryItem(name: "fields", value: "id,name,size")
-        ]
-        
-        guard let url = components.url else { return false }
-        
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        
-        do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse else { return false }
-            return httpResponse.statusCode == 200
-        } catch {
-            print("Verification failed: \(error)")
-            return false
-        }
-    }
-    
     func signOut() {
         GIDSignIn.sharedInstance.signOut()
         isAuthenticated = false

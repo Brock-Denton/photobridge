@@ -115,19 +115,6 @@ struct UploadProgressView: View {
                         allSuccessful = false
                     }
                 }
-                
-                // Verify upload
-                if uploadResult.success, let fileId = uploadResult.fileId {
-                    let verified = await driveManager.verifyUpload(fileName: fileName, fileId: fileId)
-                    if !verified {
-                        await MainActor.run {
-                            if let index = uploadResults.firstIndex(where: { $0.fileName == fileName }) {
-                                uploadResults[index] = UploadResult(success: false, fileName: fileName, error: NSError(domain: "VerificationFailed", code: 1), fileId: fileId)
-                                allSuccessful = false
-                            }
-                        }
-                    }
-                }
             }
             
             // Delete originals only if all uploads were successful
