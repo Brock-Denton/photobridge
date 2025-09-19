@@ -145,7 +145,7 @@ class GoogleDriveManager: ObservableObject {
         
         var components = URLComponents(string: "\(GoogleAPIConfig.driveAPIBase)/files")!
         components.queryItems = [
-            URLQueryItem(name: "q", value: "mimeType='application/vnd.google-apps.folder' and trashed=false"),
+            URLQueryItem(name: "q", value: "mimeType='application/vnd.google-apps.folder' and trashed=false and ('root' in parents)"),
             URLQueryItem(name: "fields", value: "files(id,name,parents)"),
             URLQueryItem(name: "orderBy", value: "name")
         ]
