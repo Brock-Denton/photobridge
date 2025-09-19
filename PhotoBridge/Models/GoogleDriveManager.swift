@@ -56,7 +56,9 @@ class GoogleDriveManager: ObservableObject {
     
     private func checkAuthenticationStatus() {
         isAuthenticated = GIDSignIn.sharedInstance.currentUser != nil
+        print("🔍 Authentication status check: \(isAuthenticated ? "Authenticated" : "Not authenticated")")
         if isAuthenticated {
+            print("🔄 Already authenticated, loading folders...")
             Task {
                 await loadFolders()
             }
@@ -96,6 +98,7 @@ class GoogleDriveManager: ObservableObject {
             print("Sign-in successful!")
             print("Signed in as:", result.user.profile?.email ?? "Unknown email")
             isAuthenticated = true
+            print("🔄 Authentication successful, loading folders...")
             await loadFolders()
             
         } catch {
@@ -131,7 +134,14 @@ class GoogleDriveManager: ObservableObject {
     }
     
     func loadFolders() async {
-        guard let accessToken = await getAccessToken() else { return }
+        print("🔄 Starting to load folders...")
+        
+        guard let accessToken = await getAccessToken() else { 
+            print("❌ No access token available")
+            return 
+        }
+        
+        print("✅ Got access token: \(String(accessToken.prefix(20)))...")
         
         var components = URLComponents(string: "\(GoogleAPIConfig.driveAPIBase)/files")!
         components.queryItems = [
@@ -140,17 +150,31 @@ class GoogleDriveManager: ObservableObject {
             URLQueryItem(name: "orderBy", value: "name")
         ]
         
-        guard let url = components.url else { return }
+        guard let url = components.url else { 
+            print("❌ Failed to create URL")
+            return 
+        }
+        
+        print("🌐 Making request to: \(url)")
         
         var request = URLRequest(url: url)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         
         do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            let response = try JSONDecoder().decode(DriveFileList.self, from: data)
+            let (data, response) = try await URLSession.shared.data(for: request)
             
-            let driveFolders = response.files.map { file in
-                GoogleDriveFolder(
+            if let httpResponse = response as? HTTPURLResponse {
+                print("📡 HTTP Status: \(httpResponse.statusCode)")
+            }
+            
+            print("📦 Response data: \(String(data: data, encoding: .utf8) ?? "Unable to decode")")
+            
+            let driveResponse = try JSONDecoder().decode(DriveFileList.self, from: data)
+            print("📁 Found \(driveResponse.files.count) folders")
+            
+            let driveFolders = driveResponse.files.map { file in
+                print("📂 Folder: \(file.name) (ID: \(file.id))")
+                return GoogleDriveFolder(
                     id: file.id,
                     name: file.name,
                     parentId: file.parents?.first
@@ -161,10 +185,15 @@ class GoogleDriveManager: ObservableObject {
             let rootFolder = GoogleDriveFolder(id: "root", name: "My Drive", parentId: nil)
             folders = [rootFolder] + driveFolders
             
+            print("✅ Total folders loaded: \(folders.count)")
+            
             loadLastUsedFolder()
             
         } catch {
-            print("Failed to load folders: \(error)")
+            print("❌ Failed to load folders: \(error)")
+            if let decodingError = error as? DecodingError {
+                print("🔍 Decoding error details: \(decodingError)")
+            }
         }
     }
     
