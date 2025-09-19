@@ -407,9 +407,9 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "PhotoBridge needs access to your photos to move them to Google Drive";
 				INFOPLIST_KEY_CFBundleURLTypes = (
 					{
-						CFBundleURLName = "com.photobridge.app.oauth";
+						CFBundleURLName = "com.googleusercontent.apps.74309569492-ebossfoerkapvf1ikhajn6pclaf1qlvl";
 						CFBundleURLSchemes = (
-							"com.photobridge.app"
+							"com.googleusercontent.apps.74309569492-ebossfoerkapvf1ikhajn6pclaf1qlvl"
 						);
 					}
 				);
@@ -456,9 +456,9 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "PhotoBridge needs access to your photos to move them to Google Drive";
 				INFOPLIST_KEY_CFBundleURLTypes = (
 					{
-						CFBundleURLName = "com.photobridge.app.oauth";
+						CFBundleURLName = "com.googleusercontent.apps.74309569492-ebossfoerkapvf1ikhajn6pclaf1qlvl";
 						CFBundleURLSchemes = (
-							"com.photobridge.app"
+							"com.googleusercontent.apps.74309569492-ebossfoerkapvf1ikhajn6pclaf1qlvl"
 						);
 					}
 				);

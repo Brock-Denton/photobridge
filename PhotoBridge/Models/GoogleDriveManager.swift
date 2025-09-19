@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import GoogleSignIn
 
 struct GoogleDriveFolder: Identifiable, Hashable, Codable {
     let id: String
@@ -46,24 +47,18 @@ class GoogleDriveManager: ObservableObject {
     @Published var uploadProgress: [String: Double] = [:]
     @Published var isUploading = false
     
-    private let authManager = GoogleAuthManager()
     private let lastFolderKey = "last_used_folder_id"
     
     init() {
-        setupAuthObserver()
+        checkAuthenticationStatus()
         loadLastUsedFolder()
     }
     
-    private func setupAuthObserver() {
-        Task { @MainActor in
-            for await _ in NotificationCenter.default.notifications(named: .authStatusChanged) {
-                isAuthenticated = authManager.isAuthenticated
-                if isAuthenticated {
-                    await loadFolders()
-                } else {
-                    folders = []
-                    selectedFolder = nil
-                }
+    private func checkAuthenticationStatus() {
+        isAuthenticated = GIDSignIn.sharedInstance.currentUser != nil
+        if isAuthenticated {
+            Task {
+                await loadFolders()
             }
         }
     }
@@ -76,19 +71,46 @@ class GoogleDriveManager: ObservableObject {
     }
     
     func authenticate() async {
+        guard let presentingViewController = topViewController() else {
+            print("No presenting view controller found")
+            return
+        }
+        
+        let config = GIDConfiguration(clientID: GoogleAPIConfig.clientId)
+        GIDSignIn.sharedInstance.configuration = config
+        
         do {
-            try await authManager.startAuthentication()
-            isAuthenticated = authManager.isAuthenticated
-            if isAuthenticated {
-                await loadFolders()
-            }
+            let result = try await GIDSignIn.sharedInstance.signIn(
+                withPresenting: presentingViewController,
+                hint: nil,
+                additionalScopes: GoogleAPIConfig.scopes
+            )
+            
+            print("Signed in as:", result.user.profile?.email ?? "")
+            isAuthenticated = true
+            await loadFolders()
+            
         } catch {
-            print("Authentication failed: \(error)")
+            print("Sign-in failed:", error)
+            isAuthenticated = false
         }
     }
     
+    private func topViewController() -> UIViewController? {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else {
+            return nil
+        }
+        
+        var topController = window.rootViewController
+        while let presentedViewController = topController?.presentedViewController {
+            topController = presentedViewController
+        }
+        return topController
+    }
+    
     func loadFolders() async {
-        guard let accessToken = authManager.accessToken else { return }
+        guard let accessToken = await getAccessToken() else { return }
         
         var components = URLComponents(string: "\(GoogleAPIConfig.driveAPIBase)/files")!
         components.queryItems = [
@@ -130,9 +152,21 @@ class GoogleDriveManager: ObservableObject {
         UserDefaults.standard.set(folder.id, forKey: lastFolderKey)
     }
     
+    private func getAccessToken() async -> String? {
+        return await withCheckedContinuation { continuation in
+            GIDSignIn.sharedInstance.currentUser?.refreshTokensIfNeeded { user, error in
+                if let user = user {
+                    continuation.resume(returning: user.accessToken.tokenString)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+    
     func uploadFile(data: Data, fileName: String) async -> UploadResult {
         guard let folder = selectedFolder,
-              let accessToken = authManager.accessToken else {
+              let accessToken = await getAccessToken() else {
             return UploadResult(success: false, fileName: fileName, error: NSError(domain: "NoFolderSelected", code: 0), fileId: nil)
         }
         
@@ -220,7 +254,7 @@ class GoogleDriveManager: ObservableObject {
     }
     
     func verifyUpload(fileName: String, fileId: String) async -> Bool {
-        guard let accessToken = authManager.accessToken else { return false }
+        guard let accessToken = await getAccessToken() else { return false }
         
         var components = URLComponents(string: "\(GoogleAPIConfig.driveAPIBase)/files/\(fileId)")!
         components.queryItems = [
@@ -243,7 +277,7 @@ class GoogleDriveManager: ObservableObject {
     }
     
     func signOut() {
-        authManager.signOut()
+        GIDSignIn.sharedInstance.signOut()
         isAuthenticated = false
         folders = []
         selectedFolder = nil
@@ -251,8 +285,4 @@ class GoogleDriveManager: ObservableObject {
         isUploading = false
         UserDefaults.standard.removeObject(forKey: lastFolderKey)
     }
-}
-
-extension Notification.Name {
-    static let authStatusChanged = Notification.Name("authStatusChanged")
 }
