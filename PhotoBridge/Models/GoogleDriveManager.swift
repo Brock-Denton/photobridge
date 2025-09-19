@@ -29,7 +29,7 @@ struct UploadResult {
 struct DriveFile: Codable {
     let id: String
     let name: String
-    let mimeType: String
+    let mimeType: String?
     let size: String?
     let parents: [String]?
 }
