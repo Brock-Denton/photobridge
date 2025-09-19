@@ -14,6 +14,7 @@ struct UploadProgressView: View {
     @State private var uploadResults: [UploadResult] = []
     @State private var isUploading = false
     @State private var showResults = false
+    @State private var showFolderPicker = false
     
     var selectedCount: Int {
         photoManager.selectedAssets.count
@@ -35,24 +36,18 @@ struct UploadProgressView: View {
                     .font(.caption)
                 }
                 
-                Button(action: startUpload) {
+                Button(action: { showFolderPicker = true }) {
                     HStack {
-                        if isUploading {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "icloud.and.arrow.up")
-                        }
-                        
-                        Text(isUploading ? "Uploading..." : "Upload & Delete")
+                        Image(systemName: "folder.badge.plus")
+                        Text("Move")
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(canUpload ? Color.blue : Color.gray)
+                    .background(canMove ? Color.blue : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
-                .disabled(!canUpload || isUploading)
+                .disabled(!canMove)
                 
                 if isUploading {
                     UploadProgressDetailsView(
@@ -62,31 +57,41 @@ struct UploadProgressView: View {
                 }
             }
         }
-        .alert("Upload Complete", isPresented: $showResults) {
+        .sheet(isPresented: $showFolderPicker) {
+            MoveToFolderView(
+                driveManager: driveManager,
+                photoManager: photoManager,
+                onMove: { folder in
+                    showFolderPicker = false
+                    startMove(to: folder)
+                }
+            )
+        }
+        .alert("Move Complete", isPresented: $showResults) {
             Button("OK") {
                 uploadResults.removeAll()
+                photoManager.clearSelection()
             }
         } message: {
             let successCount = uploadResults.filter { $0.success }.count
             let totalCount = uploadResults.count
             
             if successCount == totalCount {
-                Text("All \(totalCount) files uploaded successfully and deleted from your device!")
+                Text("\(totalCount) photos deleted and moved to Drive!")
             } else {
-                Text("\(successCount) of \(totalCount) files uploaded successfully. No files were deleted.")
+                Text("\(successCount) of \(totalCount) photos moved successfully. No photos were deleted.")
             }
         }
     }
     
-    private var canUpload: Bool {
+    private var canMove: Bool {
         selectedCount > 0 && 
-        driveManager.isAuthenticated && 
-        driveManager.selectedFolder != nil &&
+        driveManager.isAuthenticated &&
         !isUploading
     }
     
-    private func startUpload() {
-        guard canUpload else { return }
+    private func startMove(to folder: GoogleDriveFolder) {
+        guard canMove else { return }
         
         isUploading = true
         uploadResults.removeAll()
@@ -95,7 +100,7 @@ struct UploadProgressView: View {
             let selectedAssets = photoManager.getSelectedAssets()
             var allSuccessful = true
             
-            // Upload each file
+            // Upload each file to the selected folder
             for asset in selectedAssets {
                 guard let data = await photoManager.getAssetData(for: asset) else {
                     let result = UploadResult(success: false, fileName: photoManager.getAssetFileName(for: asset), error: NSError(domain: "NoData", code: 0), fileId: nil)
@@ -107,7 +112,7 @@ struct UploadProgressView: View {
                 }
                 
                 let fileName = photoManager.getAssetFileName(for: asset)
-                let uploadResult = await driveManager.uploadFile(data: data, fileName: fileName)
+                let uploadResult = await driveManager.uploadFileToFolder(data: data, fileName: fileName, folderId: folder.id)
                 
                 await MainActor.run {
                     uploadResults.append(uploadResult)
@@ -131,6 +136,105 @@ struct UploadProgressView: View {
                 showResults = true
             }
         }
+    }
+}
+
+struct MoveToFolderView: View {
+    @ObservedObject var driveManager: GoogleDriveManager
+    @ObservedObject var photoManager: PhotoLibraryManager
+    let onMove: (GoogleDriveFolder) -> Void
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var showCreateFolder = false
+    @State private var newFolderName = ""
+    
+    var selectedCount: Int {
+        photoManager.selectedAssets.count
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Header
+                VStack(spacing: 12) {
+                    Text("Move \(selectedCount) photo\(selectedCount == 1 ? "" : "s")")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    
+                    Text("Select a folder to move your photos to Google Drive")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding()
+                
+                Divider()
+                
+                // Folder list
+                List {
+                    // Create new folder option
+                    Button(action: { showCreateFolder = true }) {
+                        HStack {
+                            Image(systemName: "folder.badge.plus")
+                                .foregroundColor(.blue)
+                            Text("Create New Folder")
+                                .foregroundColor(.blue)
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // Existing folders
+                    ForEach(driveManager.folders) { folder in
+                        Button(action: { onMove(folder) }) {
+                            HStack {
+                                Image(systemName: folder.id == "root" ? "house" : "folder")
+                                    .foregroundColor(.blue)
+                                Text(folder.name)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+            .navigationTitle("Select Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .alert("Create New Folder", isPresented: $showCreateFolder) {
+            TextField("Folder Name", text: $newFolderName)
+            Button("Create") {
+                createNewFolder()
+            }
+            Button("Cancel", role: .cancel) {
+                newFolderName = ""
+            }
+        } message: {
+            Text("Enter a name for the new folder")
+        }
+    }
+    
+    private func createNewFolder() {
+        guard !newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        Task {
+            // Create folder in Google Drive
+            if let folder = await driveManager.createFolder(name: newFolderName) {
+                await MainActor.run {
+                    onMove(folder)
+                }
+            }
+        }
+        
+        newFolderName = ""
     }
 }
 

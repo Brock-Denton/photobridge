@@ -306,6 +306,143 @@ class GoogleDriveManager: ObservableObject {
         }
     }
     
+    func uploadFileToFolder(data: Data, fileName: String, folderId: String) async -> UploadResult {
+        guard let accessToken = await getAccessToken() else {
+            return UploadResult(success: false, fileName: fileName, error: NSError(domain: "NoAccessToken", code: 0), fileId: nil)
+        }
+        
+        uploadProgress[fileName] = 0.0
+        isUploading = true
+        
+        do {
+            // Create file metadata
+            let metadata: [String: Any] = [
+                "name": fileName,
+                "parents": [folderId]
+            ]
+            
+            let metadataData = try JSONSerialization.data(withJSONObject: metadata)
+            
+            // Create multipart upload
+            let boundary = "Boundary-\(UUID().uuidString)"
+            var body = Data()
+            
+            // Add metadata part
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
+            body.append(metadataData)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            // Add file data part
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+            body.append(data)
+            body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+            
+            // Create upload URL
+            var components = URLComponents(string: "\(GoogleAPIConfig.uploadAPIBase)/files")!
+            components.queryItems = [
+                URLQueryItem(name: "uploadType", value: "multipart"),
+                URLQueryItem(name: "fields", value: "id,name")
+            ]
+            
+            guard let url = components.url else {
+                throw NSError(domain: "InvalidURL", code: -1)
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("multipart/related; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
+            
+            // Simulate progress updates
+            let progressTask = Task {
+                for progress in stride(from: 0.1, through: 0.9, by: 0.1) {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    await MainActor.run {
+                        uploadProgress[fileName] = progress
+                    }
+                }
+            }
+            
+            let (responseData, response) = try await URLSession.shared.data(for: request)
+            progressTask.cancel()
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                throw NSError(domain: "UploadFailed", code: (response as? HTTPURLResponse)?.statusCode ?? -1)
+            }
+            
+            let uploadedFile = try JSONDecoder().decode(DriveFile.self, from: responseData)
+            
+            await MainActor.run {
+                uploadProgress[fileName] = 1.0
+                uploadProgress.removeValue(forKey: fileName)
+                isUploading = uploadProgress.isEmpty
+            }
+            
+            return UploadResult(success: true, fileName: fileName, error: nil, fileId: uploadedFile.id)
+            
+        } catch {
+            await MainActor.run {
+                uploadProgress.removeValue(forKey: fileName)
+                isUploading = uploadProgress.isEmpty
+            }
+            
+            return UploadResult(success: false, fileName: fileName, error: error, fileId: nil)
+        }
+    }
+    
+    func createFolder(name: String) async -> GoogleDriveFolder? {
+        guard let accessToken = await getAccessToken() else {
+            return nil
+        }
+        
+        let metadata: [String: Any] = [
+            "name": name,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": ["root"]
+        ]
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: metadata)
+            
+            var request = URLRequest(url: URL(string: "\(GoogleAPIConfig.driveAPIBase)/files")!)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = jsonData
+            
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                return nil
+            }
+            
+            let driveFile = try JSONDecoder().decode(DriveFile.self, from: data)
+            
+            let newFolder = GoogleDriveFolder(
+                id: driveFile.id,
+                name: driveFile.name,
+                parentId: driveFile.parents?.first
+            )
+            
+            // Add to folders list
+            await MainActor.run {
+                folders.append(newFolder)
+                folders.sort { $0.name < $1.name }
+            }
+            
+            return newFolder
+            
+        } catch {
+            print("Failed to create folder: \(error)")
+            return nil
+        }
+    }
+    
     func signOut() {
         GIDSignIn.sharedInstance.signOut()
         isAuthenticated = false
