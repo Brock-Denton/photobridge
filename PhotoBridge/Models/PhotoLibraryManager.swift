@@ -44,7 +44,6 @@ class PhotoLibraryManager: ObservableObject {
         
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        fetchOptions.includeAllBurstPhotos = false
         fetchOptions.includeHiddenAssets = false
         
         let allAssets = PHAsset.fetchAssets(with: fetchOptions)
@@ -102,7 +101,7 @@ class PhotoLibraryManager: ObservableObject {
             options.isNetworkAccessAllowed = true
             
             if asset.mediaType == .image {
-                imageManager.requestImageData(for: asset, options: options) { data, _, _, _ in
+                imageManager.requestImageDataAndOrientation(for: asset, options: options) { data, _, _, _ in
                     continuation.resume(returning: data)
                 }
             } else if asset.mediaType == .video {
