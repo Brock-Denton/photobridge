@@ -28,14 +28,28 @@ struct ContentView: View {
                         Spacer()
                         
                         if driveManager.isAuthenticated {
-                            Button("Sign Out") {
-                                driveManager.signOut()
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Connected")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                                
+                                Button("Sign Out") {
+                                    driveManager.signOut()
+                                }
+                                .font(.caption)
+                            }
+                        } else {
+                            Button("Sign In to Google Drive") {
+                                Task {
+                                    await driveManager.authenticate()
+                                }
                             }
                             .font(.caption)
+                            .foregroundColor(.blue)
                         }
                     }
-                    
-                    GoogleDriveFolderSelector(driveManager: driveManager)
                 }
                 .padding()
                 .background(Color(.systemBackground))

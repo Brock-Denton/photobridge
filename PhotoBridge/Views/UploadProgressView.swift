@@ -184,6 +184,15 @@ struct MoveToFolderView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     
+                    // Debug info
+                    HStack {
+                        Text("Debug: \(driveManager.folders.count) folders loaded")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    
                     // Existing folders
                     ForEach(driveManager.folders) { folder in
                         Button(action: { onMove(folder) }) {
@@ -206,6 +215,14 @@ struct MoveToFolderView: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                }
+            }
+        }
+        .onAppear {
+            // Ensure folders are loaded when the view appears
+            if driveManager.folders.isEmpty {
+                Task {
+                    await driveManager.loadFolders()
                 }
             }
         }
