@@ -543,8 +543,6 @@ struct SinglePhotoView: View {
             ZStack {
                 if let image = currentImage {
                     Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
                 } else if isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
