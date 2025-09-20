@@ -138,6 +138,7 @@ struct PhotoSelectionView: View {
     @State private var showSuccess = false
     @State private var moveResults: [UploadResult] = []
     @State private var isRefreshingPhotos = false
+    @State private var refreshKey = 0
     
     var selectedCount: Int {
         let count = photoManager.selectedAssets.count
@@ -173,6 +174,7 @@ struct PhotoSelectionView: View {
                 Spacer()
             } else {
                 PhotoGridView(photoManager: photoManager)
+                    .id(refreshKey) // Force complete rebuild when refreshKey changes
             }
             
             Divider()
@@ -228,24 +230,18 @@ struct PhotoSelectionView: View {
                     // Select more images button when no photos are selected
                     Button(action: {
                         print("📸 Select More Images button tapped!")
-                        isRefreshingPhotos = true
                         
-                        // Reset ALL state to initial state - like first time
+                        // Force complete reset - clear everything
                         photoManager.clearSelection()
                         selectedFolder = nil
                         moveResults.removeAll()
                         showSuccess = false
-                        print("📸 Reset all state to initial - like first time!")
                         
-                        // Trigger iOS photo selection like "Edit Selected Photos" in Settings
-                        Task {
-                            await photoManager.refreshPhotoAccess()
-                        }
+                        // Force PhotoGridView to completely rebuild
+                        refreshKey += 1
                         
-                        // Reset loading state after a brief delay
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            isRefreshingPhotos = false
-                        }
+                        // Reload photos
+                        photoManager.loadAssets()
                     }) {
                         HStack {
                             if isRefreshingPhotos {
