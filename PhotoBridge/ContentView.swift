@@ -137,8 +137,7 @@ struct PhotoSelectionView: View {
     @State private var isMoving = false
     @State private var showSuccess = false
     @State private var moveResults: [UploadResult] = []
-    @State private var isRefreshingPhotos = false
-    @State private var refreshKey = 0
+    @State private var hasUsedSelectMore = false
     
     var selectedCount: Int {
         let count = photoManager.selectedAssets.count
@@ -174,7 +173,6 @@ struct PhotoSelectionView: View {
                 Spacer()
             } else {
                 PhotoGridView(photoManager: photoManager)
-                    .id(refreshKey) // Force complete rebuild when refreshKey changes
             }
             
             Divider()
@@ -226,32 +224,18 @@ struct PhotoSelectionView: View {
                         .background(Color.blue)
                         .cornerRadius(12)
                     }
-                } else {
-                    // Select more images button when no photos are selected
+                } else if !hasUsedSelectMore {
+                    // Select more images button - only show once
                     Button(action: {
                         print("📸 Select More Images button tapped!")
+                        hasUsedSelectMore = true
                         
-                        // Force complete reset - clear everything
-                        photoManager.clearSelection()
-                        selectedFolder = nil
-                        moveResults.removeAll()
-                        showSuccess = false
-                        
-                        // Force PhotoGridView to completely rebuild
-                        refreshKey += 1
-                        
-                        // Reload photos
+                        // Simple refresh like the working first time
                         photoManager.loadAssets()
                     }) {
                         HStack {
-                            if isRefreshingPhotos {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .foregroundColor(.white)
-                            } else {
-                                Image(systemName: "photo.on.rectangle")
-                            }
-                            Text(isRefreshingPhotos ? "Refreshing..." : "Select More Images")
+                            Image(systemName: "photo.on.rectangle")
+                            Text("Select More Images")
                         }
                         .font(.headline)
                         .foregroundColor(.white)
@@ -260,7 +244,18 @@ struct PhotoSelectionView: View {
                         .background(Color.green)
                         .cornerRadius(12)
                     }
-                    .disabled(isRefreshingPhotos)
+                } else {
+                    // After first use, show message that they can scroll to select more
+                    VStack(spacing: 8) {
+                        Text("Scroll to select more photos")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Text("The photo grid above shows all your available photos")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
             }
             .padding()
