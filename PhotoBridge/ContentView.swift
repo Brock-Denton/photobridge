@@ -41,17 +41,21 @@ struct HomePageView: View {
             VStack(spacing: 20) {
                 Image(systemName: "photo.on.rectangle")
                     .font(.system(size: 80))
-                    .foregroundColor(.blue)
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
                 
                 Text("PhotoBridge")
                     .font(.largeTitle)
                     .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
                 
                 Text("Move your photos from camera roll to Google Drive")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
             }
             
             Spacer()
@@ -70,13 +74,33 @@ struct HomePageView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue)
-                .cornerRadius(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
             }
             .padding(.horizontal, 40)
             .padding(.bottom, 60)
         }
-        .background(Color(.systemBackground))
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 1.0, green: 0.6, blue: 0.2), // Warm orange
+                    Color(red: 0.9, green: 0.4, blue: 0.1), // Deeper orange
+                    Color(red: 0.7, green: 0.2, blue: 0.1), // Dark red-orange
+                    Color(red: 0.4, green: 0.1, blue: 0.2), // Deep purple-brown
+                    Color(red: 0.1, green: 0.05, blue: 0.1)  // Almost black
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .ignoresSafeArea()
     }
 }
 
@@ -90,17 +114,21 @@ struct PhotoAccessView: View {
             VStack(spacing: 20) {
                 Image(systemName: "photo.on.rectangle")
                     .font(.system(size: 80))
-                    .foregroundColor(.blue)
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
                 
                 Text("Photo Access Required")
                     .font(.largeTitle)
                     .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
                 
                 Text("PhotoBridge needs access to your photo library to help you move photos to Google Drive.")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
             }
             
             Spacer()
@@ -118,13 +146,33 @@ struct PhotoAccessView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue)
-                .cornerRadius(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
             }
             .padding(.horizontal, 40)
             .padding(.bottom, 60)
         }
-        .background(Color(.systemBackground))
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 1.0, green: 0.6, blue: 0.2), // Warm orange
+                    Color(red: 0.9, green: 0.4, blue: 0.1), // Deeper orange
+                    Color(red: 0.7, green: 0.2, blue: 0.1), // Dark red-orange
+                    Color(red: 0.4, green: 0.1, blue: 0.2), // Deep purple-brown
+                    Color(red: 0.1, green: 0.05, blue: 0.1)  // Almost black
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .ignoresSafeArea()
     }
 }
 
