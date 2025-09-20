@@ -233,10 +233,11 @@ struct PhotoSelectionView: View {
                         // Use the old working version that properly reloads photo selection
                         Task {
                             await photoManager.requestAuthorization()
-                            // Force refresh the photo grid to show newly selected photos
-                            await MainActor.run {
-                                photoManager.loadAssets()
-                            }
+                        }
+                        
+                        // Simple 2-second delay after button disappears to refresh photos
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            photoManager.loadAssets()
                         }
                     }) {
                         HStack {
