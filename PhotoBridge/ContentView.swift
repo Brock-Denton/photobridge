@@ -543,12 +543,12 @@ struct SinglePhotoView: View {
             ZStack {
                 Rectangle()
                     .fill(Color.black)
-                    .aspectRatio(1, contentMode: .fit)
                 
                 if let image = currentImage {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -653,13 +653,12 @@ struct SinglePhotoView: View {
 
 struct PhotoGridViewWithFullScreen: View {
     @ObservedObject var photoManager: PhotoLibraryManager
-    let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
     
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 2) {
+            LazyVStack(spacing: 2) {
                 ForEach(photoManager.assets, id: \.localIdentifier) { asset in
-                    PhotoThumbnailViewSimple(
+                    PhotoThumbnailViewFlexible(
                         asset: asset,
                         isSelected: photoManager.isSelected(asset),
                         onTap: {
@@ -677,7 +676,7 @@ struct PhotoGridViewWithFullScreen: View {
     }
 }
 
-struct PhotoThumbnailViewSimple: View {
+struct PhotoThumbnailViewFlexible: View {
     let asset: PHAsset
     let isSelected: Bool
     let onTap: () -> Void
@@ -691,12 +690,12 @@ struct PhotoThumbnailViewSimple: View {
         ZStack {
             Rectangle()
                 .fill(Color.gray.opacity(0.3))
-                .aspectRatio(1, contentMode: .fit)
             
             if let image = thumbnailImage {
                 Image(uiImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
                     .clipped()
             } else if isLoading {
                 ProgressView()
@@ -745,12 +744,12 @@ struct PhotoThumbnailViewSimple: View {
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true
         
-        let targetSize = CGSize(width: 200, height: 200)
+        let targetSize = CGSize(width: 400, height: 400)
         
         imageManager.requestImage(
             for: asset,
             targetSize: targetSize,
-            contentMode: .aspectFill,
+            contentMode: .aspectFit,
             options: options
         ) { image, _ in
             DispatchQueue.main.async {
