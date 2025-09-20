@@ -222,21 +222,27 @@ struct PhotoSelectionView: View {
                         .cornerRadius(12)
                     }
                 } else {
-                    // Select more images button when no photos are selected
-                    Button(action: {
-                        // This will refresh the photo grid to show all photos again
-                        photoManager.loadAssets()
-                    }) {
-                        HStack {
-                            Image(systemName: "photo.on.rectangle")
-                            Text("Select More Images")
+                    // Ready to select more images
+                    VStack(spacing: 8) {
+                        Text("Ready to select more photos")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Button(action: {
+                            // Ensure selection is cleared and ready for new selection
+                            photoManager.clearSelection()
+                        }) {
+                            HStack {
+                                Image(systemName: "photo.on.rectangle")
+                                Text("Select Photos")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(12)
                         }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.green)
-                        .cornerRadius(12)
                     }
                 }
             }
