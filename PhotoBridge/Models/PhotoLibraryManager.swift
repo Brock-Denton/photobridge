@@ -39,6 +39,18 @@ class PhotoLibraryManager: ObservableObject {
         }
     }
     
+    func refreshPhotoAccess() async {
+        // This will trigger the iOS photo selection interface if user has limited access
+        // Similar to "Edit Selected Photos" in Settings
+        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        await MainActor.run {
+            authorizationStatus = status
+            if status == .authorized || status == .limited {
+                loadAssetsWithLoading()
+            }
+        }
+    }
+    
     func loadAssets() {
         // Don't show loading spinner for refresh - just update silently
         let fetchOptions = PHFetchOptions()

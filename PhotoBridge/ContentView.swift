@@ -237,8 +237,10 @@ struct PhotoSelectionView: View {
                         showSuccess = false
                         print("📸 Reset all state to initial - like first time!")
                         
-                        // Refresh the photo grid to show all photos again
-                        photoManager.loadAssets()
+                        // Trigger iOS photo selection like "Edit Selected Photos" in Settings
+                        Task {
+                            await photoManager.refreshPhotoAccess()
+                        }
                         
                         // Reset loading state after a brief delay
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
