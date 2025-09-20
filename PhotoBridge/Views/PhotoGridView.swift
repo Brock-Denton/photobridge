@@ -29,12 +29,16 @@ struct PhotoGridView: View {
                                 asset: asset,
                                 isSelected: photoManager.isSelected(asset),
                                 onTap: {
+                                    print("📸 PhotoGridView: Asset tapped - \(asset.localIdentifier)")
                                     photoManager.toggleSelection(for: asset)
                                 }
                             )
                         }
                     }
                     .padding(.horizontal, 2)
+                }
+                .onAppear {
+                    print("📸 PhotoGridView: Displaying \(photoManager.assets.count) assets")
                 }
             }
         }

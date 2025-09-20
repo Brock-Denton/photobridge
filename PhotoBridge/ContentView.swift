@@ -137,6 +137,7 @@ struct PhotoSelectionView: View {
     @State private var isMoving = false
     @State private var showSuccess = false
     @State private var moveResults: [UploadResult] = []
+    @State private var isRefreshingPhotos = false
     
     var selectedCount: Int {
         let count = photoManager.selectedAssets.count
@@ -227,12 +228,23 @@ struct PhotoSelectionView: View {
                     // Select more images button when no photos are selected
                     Button(action: {
                         print("📸 Select More Images button tapped!")
+                        isRefreshingPhotos = true
                         // Refresh the photo grid to show all photos again
                         photoManager.loadAssets()
+                        // Reset loading state after a brief delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            isRefreshingPhotos = false
+                        }
                     }) {
                         HStack {
-                            Image(systemName: "photo.on.rectangle")
-                            Text("Select More Images")
+                            if isRefreshingPhotos {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .foregroundColor(.white)
+                            } else {
+                                Image(systemName: "photo.on.rectangle")
+                            }
+                            Text(isRefreshingPhotos ? "Refreshing..." : "Select More Images")
                         }
                         .font(.headline)
                         .foregroundColor(.white)
@@ -241,6 +253,7 @@ struct PhotoSelectionView: View {
                         .background(Color.green)
                         .cornerRadius(12)
                     }
+                    .disabled(isRefreshingPhotos)
                 }
             }
             .padding()
