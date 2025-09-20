@@ -653,12 +653,13 @@ struct SinglePhotoView: View {
 
 struct PhotoGridViewWithFullScreen: View {
     @ObservedObject var photoManager: PhotoLibraryManager
+    let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 2) {
+            LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(photoManager.assets, id: \.localIdentifier) { asset in
-                    PhotoThumbnailViewFlexible(
+                    PhotoThumbnailViewSimple(
                         asset: asset,
                         isSelected: photoManager.isSelected(asset),
                         onTap: {
@@ -676,7 +677,7 @@ struct PhotoGridViewWithFullScreen: View {
     }
 }
 
-struct PhotoThumbnailViewFlexible: View {
+struct PhotoThumbnailViewSimple: View {
     let asset: PHAsset
     let isSelected: Bool
     let onTap: () -> Void
@@ -690,12 +691,12 @@ struct PhotoThumbnailViewFlexible: View {
         ZStack {
             Rectangle()
                 .fill(Color.gray.opacity(0.3))
+                .aspectRatio(1, contentMode: .fit)
             
             if let image = thumbnailImage {
                 Image(uiImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity)
+                    .aspectRatio(contentMode: .fill)
                     .clipped()
             } else if isLoading {
                 ProgressView()
@@ -744,12 +745,12 @@ struct PhotoThumbnailViewFlexible: View {
         options.deliveryMode = .opportunistic
         options.isNetworkAccessAllowed = true
         
-        let targetSize = CGSize(width: 400, height: 400)
+        let targetSize = CGSize(width: 200, height: 200)
         
         imageManager.requestImage(
             for: asset,
             targetSize: targetSize,
-            contentMode: .aspectFit,
+            contentMode: .aspectFill,
             options: options
         ) { image, _ in
             DispatchQueue.main.async {
