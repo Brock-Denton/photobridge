@@ -233,6 +233,10 @@ struct PhotoSelectionView: View {
                         // Use the old working version that properly reloads photo selection
                         Task {
                             await photoManager.requestAuthorization()
+                            // Force refresh the photo grid to show newly selected photos
+                            await MainActor.run {
+                                photoManager.loadAssets()
+                            }
                         }
                     }) {
                         HStack {
