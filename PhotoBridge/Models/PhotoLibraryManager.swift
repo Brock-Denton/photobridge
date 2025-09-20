@@ -39,7 +39,7 @@ class PhotoLibraryManager: ObservableObject {
         }
     }
     
-    private func loadAssets() {
+    func loadAssets() {
         isLoading = true
         
         let fetchOptions = PHFetchOptions()

@@ -176,7 +176,26 @@ struct PhotoSelectionView: View {
             
             // Bottom controls
             VStack(spacing: 16) {
-                if selectedCount > 0 {
+                if isMoving {
+                    // Progress indicator during upload
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        
+                        Text("Moving photos to Google Drive...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Text("Please wait while your photos are being uploaded")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                } else if selectedCount > 0 {
                     HStack {
                         Text("\(selectedCount) photo\(selectedCount == 1 ? "" : "s") selected")
                             .font(.subheadline)
@@ -202,7 +221,23 @@ struct PhotoSelectionView: View {
                         .background(Color.blue)
                         .cornerRadius(12)
                     }
-                    .disabled(isMoving)
+                } else {
+                    // Select more images button when no photos are selected
+                    Button(action: {
+                        // This will refresh the photo grid to show all photos again
+                        photoManager.loadAssets()
+                    }) {
+                        HStack {
+                            Image(systemName: "photo.on.rectangle")
+                            Text("Select More Images")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .cornerRadius(12)
+                    }
                 }
             }
             .padding()
