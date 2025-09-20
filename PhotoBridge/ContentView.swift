@@ -545,6 +545,7 @@ struct SinglePhotoView: View {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
+                        .scaleEffect(isScreenshot(image) ? 1.25 : 1.0)
                 } else if isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -644,6 +645,17 @@ struct SinglePhotoView: View {
                 self.isLoading = false
             }
         }
+    }
+    
+    private func isScreenshot(_ image: UIImage) -> Bool {
+        let width = image.size.width
+        let height = image.size.height
+        let aspectRatio = width / height
+        
+        // Screenshots typically have aspect ratios close to device screen ratios
+        // iPhone screenshots are usually around 0.46-0.56 (portrait) or 1.8-2.2 (landscape)
+        // Regular photos are usually more square (0.7-1.4)
+        return aspectRatio < 0.6 || aspectRatio > 1.6
     }
 }
 
