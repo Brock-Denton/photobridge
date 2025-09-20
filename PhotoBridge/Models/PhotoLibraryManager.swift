@@ -25,7 +25,7 @@ class PhotoLibraryManager: ObservableObject {
     func checkAuthorizationStatus() {
         authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         if authorizationStatus == .authorized || authorizationStatus == .limited {
-            loadAssets()
+            loadAssetsWithLoading()
         }
     }
     
@@ -34,12 +34,31 @@ class PhotoLibraryManager: ObservableObject {
         await MainActor.run {
             authorizationStatus = status
             if status == .authorized || status == .limited {
-                loadAssets()
+                loadAssetsWithLoading()
             }
         }
     }
     
     func loadAssets() {
+        // Don't show loading spinner for refresh - just update silently
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        fetchOptions.includeHiddenAssets = false
+        
+        let allAssets = PHAsset.fetchAssets(with: fetchOptions)
+        
+        var assetArray: [PHAsset] = []
+        allAssets.enumerateObjects { asset, _, _ in
+            assetArray.append(asset)
+        }
+        
+        DispatchQueue.main.async {
+            self.assets = assetArray
+            print("📸 Loaded \(assetArray.count) photos")
+        }
+    }
+    
+    func loadAssetsWithLoading() {
         isLoading = true
         
         let fetchOptions = PHFetchOptions()
