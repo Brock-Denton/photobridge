@@ -139,7 +139,9 @@ struct PhotoSelectionView: View {
     @State private var moveResults: [UploadResult] = []
     
     var selectedCount: Int {
-        photoManager.selectedAssets.count
+        let count = photoManager.selectedAssets.count
+        print("📸 Selected count: \(count)")
+        return count
     }
     
     var body: some View {
@@ -224,6 +226,7 @@ struct PhotoSelectionView: View {
                 } else {
                     // Select more images button when no photos are selected
                     Button(action: {
+                        print("📸 Select More Images button tapped!")
                         // Refresh the photo grid to show all photos again
                         photoManager.loadAssets()
                     }) {
