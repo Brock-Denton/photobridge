@@ -232,6 +232,11 @@ struct PhotoSelectionView: View {
                         
                         // Back to the original simple version that worked
                         photoManager.loadAssets()
+                        
+                        // Force UI update by clearing and reloading
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            photoManager.loadAssets()
+                        }
                     }) {
                         HStack {
                             Image(systemName: "photo.on.rectangle")
