@@ -229,8 +229,17 @@ struct PhotoSelectionView: View {
                     Button(action: {
                         print("📸 Select More Images button tapped!")
                         isRefreshingPhotos = true
+                        
+                        // Reset ALL state to initial state - like first time
+                        photoManager.clearSelection()
+                        selectedFolder = nil
+                        moveResults.removeAll()
+                        showSuccess = false
+                        print("📸 Reset all state to initial - like first time!")
+                        
                         // Refresh the photo grid to show all photos again
                         photoManager.loadAssets()
+                        
                         // Reset loading state after a brief delay
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             isRefreshingPhotos = false
