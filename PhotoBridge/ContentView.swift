@@ -245,13 +245,13 @@ struct PhotoSelectionView: View {
                         .cornerRadius(12)
                     }
                 } else {
-                    // After first use, show message that they can scroll to select more
+                    // After first use, show message that they need to restart app
                     VStack(spacing: 8) {
-                        Text("Scroll to select more photos")
+                        Text("Restart App to select more photos")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        Text("The photo grid above shows all your available photos")
+                        Text("Close and reopen PhotoBridge to refresh the photo selection")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
