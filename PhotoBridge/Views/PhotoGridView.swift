@@ -11,6 +11,8 @@ import Photos
 struct PhotoGridView: View {
     @ObservedObject var photoManager: PhotoLibraryManager
     let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+    @State private var selectedAsset: PHAsset?
+    @State private var showFullScreen = false
     
     var body: some View {
         Group {
@@ -31,6 +33,10 @@ struct PhotoGridView: View {
                                 onTap: {
                                     print("📸 PhotoGridView: Asset tapped - \(asset.localIdentifier)")
                                     photoManager.toggleSelection(for: asset)
+                                },
+                                onLongPress: {
+                                    selectedAsset = asset
+                                    showFullScreen = true
                                 }
                             )
                         }
@@ -39,6 +45,21 @@ struct PhotoGridView: View {
                 }
                 .onAppear {
                     print("📸 PhotoGridView: Displaying \(photoManager.assets.count) assets")
+                }
+                .fullScreenCover(isPresented: $showFullScreen) {
+                    if let asset = selectedAsset {
+                        FullScreenPhotoView(
+                            asset: asset,
+                            isSelected: photoManager.isSelected(asset),
+                            onToggleSelection: {
+                                photoManager.toggleSelection(for: asset)
+                            },
+                            onDismiss: {
+                                showFullScreen = false
+                                selectedAsset = nil
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -49,6 +70,7 @@ struct PhotoThumbnailView: View {
     let asset: PHAsset
     let isSelected: Bool
     let onTap: () -> Void
+    let onLongPress: () -> Void
     
     @State private var thumbnailImage: UIImage?
     @State private var isLoading = true
@@ -101,6 +123,9 @@ struct PhotoThumbnailView: View {
         }
         .onTapGesture {
             onTap()
+        }
+        .onLongPressGesture {
+            onLongPress()
         }
         .onAppear {
             loadThumbnail()
@@ -180,5 +205,157 @@ struct DeniedAccessView: View {
             .buttonStyle(.borderedProminent)
         }
         .padding()
+    }
+}
+
+struct FullScreenPhotoView: View {
+    let asset: PHAsset
+    let isSelected: Bool
+    let onToggleSelection: () -> Void
+    let onDismiss: () -> Void
+    
+    @State private var fullImage: UIImage?
+    @State private var isLoading = true
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    
+    private let imageManager = PHCachingImageManager()
+    
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            if let image = fullImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .gesture(
+                        SimultaneousGesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    let delta = value / lastScale
+                                    lastScale = value
+                                    scale = min(max(scale * delta, 1.0), 5.0)
+                                }
+                                .onEnded { _ in
+                                    lastScale = 1.0
+                                    if scale < 1.0 {
+                                        withAnimation(.spring()) {
+                                            scale = 1.0
+                                            offset = .zero
+                                        }
+                                    }
+                                },
+                            DragGesture()
+                                .onChanged { value in
+                                    if scale > 1.0 {
+                                        offset = CGSize(
+                                            width: lastOffset.width + value.translation.width,
+                                            height: lastOffset.height + value.translation.height
+                                        )
+                                    }
+                                }
+                                .onEnded { _ in
+                                    lastOffset = offset
+                                }
+                        )
+                    )
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring()) {
+                            if scale > 1.0 {
+                                scale = 1.0
+                                offset = .zero
+                                lastOffset = .zero
+                            } else {
+                                scale = 2.0
+                            }
+                        }
+                    }
+            } else if isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.5)
+            }
+            
+            // Top controls
+            VStack {
+                HStack {
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.black.opacity(0.5))
+                            .clipShape(Circle())
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: onToggleSelection) {
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.title2)
+                            .foregroundColor(isSelected ? .blue : .white)
+                            .padding()
+                            .background(Color.black.opacity(0.5))
+                            .clipShape(Circle())
+                    }
+                }
+                .padding()
+                
+                Spacer()
+            }
+            
+            // Bottom info
+            VStack {
+                Spacer()
+                
+                VStack(spacing: 8) {
+                    Text("Double tap to zoom • Pinch to zoom • Drag when zoomed")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                    
+                    if isSelected {
+                        Text("✓ Selected")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                            .fontWeight(.semibold)
+                    }
+                }
+                .padding()
+                .background(Color.black.opacity(0.5))
+                .cornerRadius(12)
+                .padding(.horizontal)
+                .padding(.bottom, 50)
+            }
+        }
+        .onAppear {
+            loadFullImage()
+        }
+    }
+    
+    private func loadFullImage() {
+        let options = PHImageRequestOptions()
+        options.isSynchronous = false
+        options.deliveryMode = .highQualityFormat
+        options.isNetworkAccessAllowed = true
+        
+        let targetSize = CGSize(width: 2000, height: 2000)
+        
+        imageManager.requestImage(
+            for: asset,
+            targetSize: targetSize,
+            contentMode: .aspectFit,
+            options: options
+        ) { image, _ in
+            DispatchQueue.main.async {
+                self.fullImage = image
+                self.isLoading = false
+            }
+        }
     }
 }
