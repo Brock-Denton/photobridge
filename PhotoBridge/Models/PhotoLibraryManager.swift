@@ -56,6 +56,7 @@ class PhotoLibraryManager: ObservableObject {
         DispatchQueue.main.async {
             self.assets = assetArray
             self.isLoading = false
+            print("📸 Loaded \(assetArray.count) photos")
         }
     }
     
@@ -63,9 +64,12 @@ class PhotoLibraryManager: ObservableObject {
         let identifier = asset.localIdentifier
         if selectedAssets.contains(identifier) {
             selectedAssets.remove(identifier)
+            print("📸 Deselected photo: \(identifier)")
         } else {
             selectedAssets.insert(identifier)
+            print("📸 Selected photo: \(identifier)")
         }
+        print("📸 Total selected: \(selectedAssets.count)")
     }
     
     func isSelected(_ asset: PHAsset) -> Bool {
@@ -90,7 +94,11 @@ class PhotoLibraryManager: ObservableObject {
         
         // Remove from local arrays
         selectedAssets.removeAll()
-        loadAssets() // Refresh the asset list
+        
+        // Refresh the asset list on main thread
+        await MainActor.run {
+            loadAssets()
+        }
     }
     
     func getAssetData(for asset: PHAsset) async -> Data? {
