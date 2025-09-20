@@ -230,8 +230,10 @@ struct PhotoSelectionView: View {
                         print("📸 Select More Images button tapped!")
                         hasUsedSelectMore = true
                         
-                        // Simple refresh like the working first time
-                        photoManager.loadAssets()
+                        // Use the old working version that properly reloads photo selection
+                        Task {
+                            await photoManager.requestAuthorization()
+                        }
                     }) {
                         HStack {
                             Image(systemName: "photo.on.rectangle")
