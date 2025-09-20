@@ -540,40 +540,43 @@ struct SinglePhotoView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Photo display
-            ZStack {
-                Rectangle()
-                    .fill(Color.black)
+            GeometryReader { geometry in
+                ZStack {
+                    Rectangle()
+                        .fill(Color.black)
+                    
+                    if let image = currentImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: geometry.size.width)
+                            .clipped()
+                    } else if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                    }
                 
-                if let image = currentImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
-                }
-                
-                // Selection overlay
-                if !photoManager.assets.isEmpty {
-                    let currentAsset = photoManager.assets[currentIndex]
-                    if photoManager.isSelected(currentAsset) {
-                        Rectangle()
-                            .fill(Color.blue.opacity(0.3))
-                            .overlay(
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.blue)
-                                    .font(.largeTitle)
-                                    .background(Color.white, in: Circle())
-                            )
+                    // Selection overlay
+                    if !photoManager.assets.isEmpty {
+                        let currentAsset = photoManager.assets[currentIndex]
+                        if photoManager.isSelected(currentAsset) {
+                            Rectangle()
+                                .fill(Color.blue.opacity(0.3))
+                                .overlay(
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.blue)
+                                        .font(.largeTitle)
+                                        .background(Color.white, in: Circle())
+                                )
+                        }
                     }
                 }
-            }
-            .onTapGesture {
-                if !photoManager.assets.isEmpty {
-                    let currentAsset = photoManager.assets[currentIndex]
-                    photoManager.toggleSelection(for: currentAsset)
+                .onTapGesture {
+                    if !photoManager.assets.isEmpty {
+                        let currentAsset = photoManager.assets[currentIndex]
+                        photoManager.toggleSelection(for: currentAsset)
+                    }
                 }
             }
             
