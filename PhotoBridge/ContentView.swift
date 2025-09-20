@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Photos
 
 struct ContentView: View {
     @StateObject private var photoManager = PhotoLibraryManager()
@@ -186,6 +187,7 @@ struct PhotoSelectionView: View {
     @State private var showSuccess = false
     @State private var moveResults: [UploadResult] = []
     @State private var hasUsedSelectMore = false
+    @State private var isGridView = true
     
     var selectedCount: Int {
         let count = photoManager.selectedAssets.count
@@ -194,18 +196,26 @@ struct PhotoSelectionView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Select Photos to Move")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Spacer()
-                
-                Button("Sign Out") {
-                    driveManager.signOut()
+            VStack(spacing: 0) {
+                // Header
+                    HStack {
+                Button(action: {
+                    isGridView.toggle()
+                }) {
+                    Image(systemName: isGridView ? "rectangle.grid.2x2" : "photo")
+                            .font(.title2)
+                            .foregroundColor(.blue)
                 }
+                        
+                Text("Select Photos to Move")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        Spacer()
+                        
+                            Button("Sign Out") {
+                                driveManager.signOut()
+                            }
                 .font(.caption)
                 .foregroundColor(.red)
             }
@@ -214,13 +224,15 @@ struct PhotoSelectionView: View {
             
             Divider()
             
-            // Photo grid
+            // Photo display
             if photoManager.isLoading {
                 Spacer()
                 ProgressView("Loading photos...")
                 Spacer()
-            } else {
+            } else if isGridView {
                 PhotoGridViewWithFullScreen(photoManager: photoManager)
+            } else {
+                SinglePhotoView(photoManager: photoManager)
             }
             
             Divider()
@@ -439,7 +451,7 @@ struct FolderPickerView: View {
                                     .foregroundColor(.blue)
                                 Text(folder.name)
                                     .foregroundColor(.primary)
-                                Spacer()
+                    Spacer()
                                 
                                 if selectedFolder?.id == folder.id {
                                     Image(systemName: "checkmark.circle.fill")
@@ -517,26 +529,142 @@ struct FolderPickerView: View {
     }
 }
 
+struct SinglePhotoView: View {
+    @ObservedObject var photoManager: PhotoLibraryManager
+    @State private var currentIndex = 0
+    @State private var currentImage: UIImage?
+    @State private var isLoading = true
+    
+    private let imageManager = PHCachingImageManager()
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Photo display
+            ZStack {
+                Rectangle()
+                    .fill(Color.black)
+                    .aspectRatio(1, contentMode: .fit)
+                
+                if let image = currentImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } else if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                }
+                
+                // Selection overlay
+                if !photoManager.assets.isEmpty {
+                    let currentAsset = photoManager.assets[currentIndex]
+                    if photoManager.isSelected(currentAsset) {
+                        Rectangle()
+                            .fill(Color.blue.opacity(0.3))
+                            .overlay(
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.largeTitle)
+                                    .background(Color.white, in: Circle())
+                            )
+                    }
+                }
+            }
+            .onTapGesture {
+                if !photoManager.assets.isEmpty {
+                    let currentAsset = photoManager.assets[currentIndex]
+                    photoManager.toggleSelection(for: currentAsset)
+                }
+            }
+            
+            // Navigation controls
+            HStack {
+                Button(action: previousPhoto) {
+                    Image(systemName: "chevron.left")
+                        .font(.title)
+                        .foregroundColor(.blue)
+                }
+                .disabled(currentIndex == 0)
+                
+                Spacer()
+                
+                Text("\(currentIndex + 1) of \(photoManager.assets.count)")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Button(action: nextPhoto) {
+                    Image(systemName: "chevron.right")
+                        .font(.title)
+                        .foregroundColor(.blue)
+                }
+                .disabled(currentIndex >= photoManager.assets.count - 1)
+            }
+                    .padding()
+                    .background(Color(.systemBackground))
+        }
+        .onAppear {
+            loadCurrentImage()
+        }
+        .onChange(of: currentIndex) { _ in
+            loadCurrentImage()
+        }
+    }
+    
+    private func previousPhoto() {
+        if currentIndex > 0 {
+            currentIndex -= 1
+        }
+    }
+    
+    private func nextPhoto() {
+        if currentIndex < photoManager.assets.count - 1 {
+            currentIndex += 1
+        }
+    }
+    
+    private func loadCurrentImage() {
+        guard !photoManager.assets.isEmpty && currentIndex < photoManager.assets.count else { return }
+        
+        isLoading = true
+        let asset = photoManager.assets[currentIndex]
+        
+        let options = PHImageRequestOptions()
+        options.isSynchronous = false
+        options.deliveryMode = .highQualityFormat
+        options.isNetworkAccessAllowed = true
+        
+        let targetSize = CGSize(width: 1000, height: 1000)
+        
+        imageManager.requestImage(
+            for: asset,
+            targetSize: targetSize,
+            contentMode: .aspectFit,
+            options: options
+        ) { image, _ in
+            DispatchQueue.main.async {
+                self.currentImage = image
+                self.isLoading = false
+            }
+        }
+    }
+}
+
 struct PhotoGridViewWithFullScreen: View {
     @ObservedObject var photoManager: PhotoLibraryManager
     let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
-    @State private var selectedAsset: PHAsset?
-    @State private var showFullScreen = false
     
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(photoManager.assets, id: \.localIdentifier) { asset in
-                    PhotoThumbnailViewWithFullScreen(
+                    PhotoThumbnailViewSimple(
                         asset: asset,
                         isSelected: photoManager.isSelected(asset),
                         onTap: {
                             print("📸 PhotoGridView: Asset tapped - \(asset.localIdentifier)")
                             photoManager.toggleSelection(for: asset)
-                        },
-                        onLongPress: {
-                            selectedAsset = asset
-                            showFullScreen = true
                         }
                     )
                 }
@@ -546,29 +674,13 @@ struct PhotoGridViewWithFullScreen: View {
         .onAppear {
             print("📸 PhotoGridView: Displaying \(photoManager.assets.count) assets")
         }
-        .fullScreenCover(isPresented: $showFullScreen) {
-            if let asset = selectedAsset {
-                FullScreenPhotoView(
-                    asset: asset,
-                    isSelected: photoManager.isSelected(asset),
-                    onToggleSelection: {
-                        photoManager.toggleSelection(for: asset)
-                    },
-                    onDismiss: {
-                        showFullScreen = false
-                        selectedAsset = nil
-                    }
-                )
-            }
-        }
     }
 }
 
-struct PhotoThumbnailViewWithFullScreen: View {
+struct PhotoThumbnailViewSimple: View {
     let asset: PHAsset
     let isSelected: Bool
     let onTap: () -> Void
-    let onLongPress: () -> Void
     
     @State private var thumbnailImage: UIImage?
     @State private var isLoading = true
@@ -622,9 +734,6 @@ struct PhotoThumbnailViewWithFullScreen: View {
         .onTapGesture {
             onTap()
         }
-        .onLongPressGesture {
-            onLongPress()
-        }
         .onAppear {
             loadThumbnail()
         }
@@ -652,157 +761,6 @@ struct PhotoThumbnailViewWithFullScreen: View {
     }
 }
 
-struct FullScreenPhotoView: View {
-    let asset: PHAsset
-    let isSelected: Bool
-    let onToggleSelection: () -> Void
-    let onDismiss: () -> Void
-    
-    @State private var fullImage: UIImage?
-    @State private var isLoading = true
-    @State private var scale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
-    @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
-    
-    private let imageManager = PHCachingImageManager()
-    
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            
-            if let image = fullImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .scaleEffect(scale)
-                    .offset(offset)
-                    .gesture(
-                        SimultaneousGesture(
-                            MagnificationGesture()
-                                .onChanged { value in
-                                    let delta = value / lastScale
-                                    lastScale = value
-                                    scale = min(max(scale * delta, 1.0), 5.0)
-                                }
-                                .onEnded { _ in
-                                    lastScale = 1.0
-                                    if scale < 1.0 {
-                                        withAnimation(.spring()) {
-                                            scale = 1.0
-                                            offset = .zero
-                                        }
-                                    }
-                                },
-                            DragGesture()
-                                .onChanged { value in
-                                    if scale > 1.0 {
-                                        offset = CGSize(
-                                            width: lastOffset.width + value.translation.width,
-                                            height: lastOffset.height + value.translation.height
-                                        )
-                                    }
-                                }
-                                .onEnded { _ in
-                                    lastOffset = offset
-                                }
-                        )
-                    )
-                    .onTapGesture(count: 2) {
-                        withAnimation(.spring()) {
-                            if scale > 1.0 {
-                                scale = 1.0
-                                offset = .zero
-                                lastOffset = .zero
-                            } else {
-                                scale = 2.0
-                            }
-                        }
-                    }
-            } else if isLoading {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .scaleEffect(1.5)
-            }
-            
-            // Top controls
-            VStack {
-                HStack {
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.black.opacity(0.5))
-                            .clipShape(Circle())
-                    }
-                    
-                    Spacer()
-                    
-                    Button(action: onToggleSelection) {
-                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                            .font(.title2)
-                            .foregroundColor(isSelected ? .blue : .white)
-                            .padding()
-                            .background(Color.black.opacity(0.5))
-                            .clipShape(Circle())
-                    }
-                }
-                .padding()
-                
-                Spacer()
-            }
-            
-            // Bottom info
-            VStack {
-                Spacer()
-                
-                VStack(spacing: 8) {
-                    Text("Double tap to zoom • Pinch to zoom • Drag when zoomed")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                    
-                    if isSelected {
-                        Text("✓ Selected")
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
-                            .fontWeight(.semibold)
-                    }
-                }
-                .padding()
-                .background(Color.black.opacity(0.5))
-                .cornerRadius(12)
-                .padding(.horizontal)
-                .padding(.bottom, 50)
-            }
-        }
-        .onAppear {
-            loadFullImage()
-        }
-    }
-    
-    private func loadFullImage() {
-        let options = PHImageRequestOptions()
-        options.isSynchronous = false
-        options.deliveryMode = .highQualityFormat
-        options.isNetworkAccessAllowed = true
-        
-        let targetSize = CGSize(width: 2000, height: 2000)
-        
-        imageManager.requestImage(
-            for: asset,
-            targetSize: targetSize,
-            contentMode: .aspectFit,
-            options: options
-        ) { image, _ in
-            DispatchQueue.main.async {
-                self.fullImage = image
-                self.isLoading = false
-            }
-        }
-    }
-}
 
 #Preview {
     ContentView()
