@@ -230,15 +230,8 @@ struct PhotoSelectionView: View {
                         print("📸 Select More Images button tapped!")
                         hasUsedSelectMore = true
                         
-                        // Use the old working version that properly reloads photo selection
-                        Task {
-                            await photoManager.requestAuthorization()
-                        }
-                        
-                        // Simple 2-second delay after button disappears to refresh photos
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            photoManager.loadAssets()
-                        }
+                        // Back to the original simple version that worked
+                        photoManager.loadAssets()
                     }) {
                         HStack {
                             Image(systemName: "photo.on.rectangle")
