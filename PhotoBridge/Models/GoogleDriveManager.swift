@@ -226,98 +226,122 @@ class GoogleDriveManager: ObservableObject {
         uploadProgress[fileName] = 0.0
         isUploading = true
         
-        do {
-            // Determine MIME type based on file extension
-            let mimeType: String
-            if fileName.lowercased().hasSuffix(".mov") {
-                mimeType = "video/quicktime"
-            } else if fileName.lowercased().hasSuffix(".mp4") {
-                mimeType = "video/mp4"
-            } else if fileName.lowercased().hasSuffix(".jpg") || fileName.lowercased().hasSuffix(".jpeg") {
-                mimeType = "image/jpeg"
-            } else if fileName.lowercased().hasSuffix(".png") {
-                mimeType = "image/png"
-            } else {
-                mimeType = "application/octet-stream"
-            }
-            
-            // Create file metadata
-            let metadata: [String: Any] = [
-                "name": fileName,
-                "parents": [folder.id]
-            ]
-            
-            let metadataData = try JSONSerialization.data(withJSONObject: metadata)
-            
-            // Create multipart upload
-            let boundary = "Boundary-\(UUID().uuidString)"
-            var body = Data()
-            
-            // Add metadata part
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
-            body.append(metadataData)
-            body.append("\r\n".data(using: .utf8)!)
-            
-            // Add file data part
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
-            body.append(data)
-            body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-            
-            // Create upload URL
-            var components = URLComponents(string: "\(GoogleAPIConfig.uploadAPIBase)/files")!
-            components.queryItems = [
-                URLQueryItem(name: "uploadType", value: "multipart"),
-                URLQueryItem(name: "fields", value: "id,name")
-            ]
-            
-            guard let url = components.url else {
-                throw NSError(domain: "InvalidURL", code: -1)
-            }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-            request.setValue("multipart/related; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-            request.httpBody = body
-            
-            // Simulate progress updates
-            let progressTask = Task {
-                for progress in stride(from: 0.1, through: 0.9, by: 0.1) {
-                    try? await Task.sleep(nanoseconds: 100_000_000)
-                    await MainActor.run {
-                        uploadProgress[fileName] = progress
+        // Retry logic for network issues
+        let maxRetries = 3
+        var lastError: Error?
+        
+        for attempt in 1...maxRetries {
+            do {
+                // Determine MIME type based on file extension
+                let mimeType: String
+                if fileName.lowercased().hasSuffix(".mov") {
+                    mimeType = "video/quicktime"
+                } else if fileName.lowercased().hasSuffix(".mp4") {
+                    mimeType = "video/mp4"
+                } else if fileName.lowercased().hasSuffix(".jpg") || fileName.lowercased().hasSuffix(".jpeg") {
+                    mimeType = "image/jpeg"
+                } else if fileName.lowercased().hasSuffix(".png") {
+                    mimeType = "image/png"
+                } else {
+                    mimeType = "application/octet-stream"
+                }
+                
+                // Create file metadata
+                let metadata: [String: Any] = [
+                    "name": fileName,
+                    "parents": [folder.id]
+                ]
+                
+                let metadataData = try JSONSerialization.data(withJSONObject: metadata)
+                
+                // Create multipart upload
+                let boundary = "Boundary-\(UUID().uuidString)"
+                var body = Data()
+                
+                // Add metadata part
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
+                body.append(metadataData)
+                body.append("\r\n".data(using: .utf8)!)
+                
+                // Add file data part
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+                body.append(data)
+                body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+                
+                // Create upload URL
+                var components = URLComponents(string: "\(GoogleAPIConfig.uploadAPIBase)/files")!
+                components.queryItems = [
+                    URLQueryItem(name: "uploadType", value: "multipart"),
+                    URLQueryItem(name: "fields", value: "id,name")
+                ]
+                
+                guard let url = components.url else {
+                    throw NSError(domain: "InvalidURL", code: -1)
+                }
+                
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+                request.setValue("multipart/related; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+                request.httpBody = body
+                
+                // Configure URLSession for better reliability
+                let config = URLSessionConfiguration.default
+                config.timeoutIntervalForRequest = 60.0 // 60 seconds
+                config.timeoutIntervalForResource = 300.0 // 5 minutes for large files
+                config.allowsCellularAccess = true
+                config.waitsForConnectivity = true
+                
+                let session = URLSession(configuration: config)
+                
+                // Simulate progress updates
+                let progressTask = Task {
+                    for progress in stride(from: 0.1, through: 0.9, by: 0.1) {
+                        try? await Task.sleep(nanoseconds: 100_000_000)
+                        await MainActor.run {
+                            uploadProgress[fileName] = progress
+                        }
                     }
                 }
+                
+                let (responseData, response) = try await session.data(for: request)
+                progressTask.cancel()
+                
+                guard let httpResponse = response as? HTTPURLResponse,
+                      httpResponse.statusCode == 200 else {
+                    throw NSError(domain: "UploadFailed", code: (response as? HTTPURLResponse)?.statusCode ?? -1)
+                }
+                
+                let uploadedFile = try JSONDecoder().decode(DriveFile.self, from: responseData)
+                
+                await MainActor.run {
+                    uploadProgress[fileName] = 1.0
+                    uploadProgress.removeValue(forKey: fileName)
+                    isUploading = uploadProgress.isEmpty
+                }
+                
+                return UploadResult(success: true, fileName: fileName, error: nil, fileId: uploadedFile.id)
+                
+            } catch {
+                lastError = error
+                print("Upload attempt \(attempt) failed: \(error.localizedDescription)")
+                
+                // If this is not the last attempt, wait before retrying
+                if attempt < maxRetries {
+                    let delay = Double(attempt) * 2.0 // Exponential backoff: 2s, 4s, 6s
+                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                }
             }
-            
-            let (responseData, response) = try await URLSession.shared.data(for: request)
-            progressTask.cancel()
-            
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                throw NSError(domain: "UploadFailed", code: (response as? HTTPURLResponse)?.statusCode ?? -1)
-            }
-            
-            let uploadedFile = try JSONDecoder().decode(DriveFile.self, from: responseData)
-            
-            await MainActor.run {
-                uploadProgress[fileName] = 1.0
-                uploadProgress.removeValue(forKey: fileName)
-                isUploading = uploadProgress.isEmpty
-            }
-            
-            return UploadResult(success: true, fileName: fileName, error: nil, fileId: uploadedFile.id)
-            
-        } catch {
-            await MainActor.run {
-                uploadProgress.removeValue(forKey: fileName)
-                isUploading = uploadProgress.isEmpty
-            }
-            
-            return UploadResult(success: false, fileName: fileName, error: error, fileId: nil)
         }
+        
+        await MainActor.run {
+            uploadProgress.removeValue(forKey: fileName)
+            isUploading = uploadProgress.isEmpty
+        }
+        
+        return UploadResult(success: false, fileName: fileName, error: lastError, fileId: nil)
     }
     
     func uploadFileToFolder(data: Data, fileName: String, folderId: String) async -> UploadResult {
@@ -328,98 +352,122 @@ class GoogleDriveManager: ObservableObject {
         uploadProgress[fileName] = 0.0
         isUploading = true
         
-        do {
-            // Determine MIME type based on file extension
-            let mimeType: String
-            if fileName.lowercased().hasSuffix(".mov") {
-                mimeType = "video/quicktime"
-            } else if fileName.lowercased().hasSuffix(".mp4") {
-                mimeType = "video/mp4"
-            } else if fileName.lowercased().hasSuffix(".jpg") || fileName.lowercased().hasSuffix(".jpeg") {
-                mimeType = "image/jpeg"
-            } else if fileName.lowercased().hasSuffix(".png") {
-                mimeType = "image/png"
-            } else {
-                mimeType = "application/octet-stream"
-            }
-            
-            // Create file metadata
-            let metadata: [String: Any] = [
-                "name": fileName,
-                "parents": [folderId]
-            ]
-            
-            let metadataData = try JSONSerialization.data(withJSONObject: metadata)
-            
-            // Create multipart upload
-            let boundary = "Boundary-\(UUID().uuidString)"
-            var body = Data()
-            
-            // Add metadata part
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
-            body.append(metadataData)
-            body.append("\r\n".data(using: .utf8)!)
-            
-            // Add file data part
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
-            body.append(data)
-            body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-            
-            // Create upload URL
-            var components = URLComponents(string: "\(GoogleAPIConfig.uploadAPIBase)/files")!
-            components.queryItems = [
-                URLQueryItem(name: "uploadType", value: "multipart"),
-                URLQueryItem(name: "fields", value: "id,name")
-            ]
-            
-            guard let url = components.url else {
-                throw NSError(domain: "InvalidURL", code: -1)
-            }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-            request.setValue("multipart/related; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-            request.httpBody = body
-            
-            // Simulate progress updates
-            let progressTask = Task {
-                for progress in stride(from: 0.1, through: 0.9, by: 0.1) {
-                    try? await Task.sleep(nanoseconds: 100_000_000)
-                    await MainActor.run {
-                        uploadProgress[fileName] = progress
+        // Retry logic for network issues
+        let maxRetries = 3
+        var lastError: Error?
+        
+        for attempt in 1...maxRetries {
+            do {
+                // Determine MIME type based on file extension
+                let mimeType: String
+                if fileName.lowercased().hasSuffix(".mov") {
+                    mimeType = "video/quicktime"
+                } else if fileName.lowercased().hasSuffix(".mp4") {
+                    mimeType = "video/mp4"
+                } else if fileName.lowercased().hasSuffix(".jpg") || fileName.lowercased().hasSuffix(".jpeg") {
+                    mimeType = "image/jpeg"
+                } else if fileName.lowercased().hasSuffix(".png") {
+                    mimeType = "image/png"
+                } else {
+                    mimeType = "application/octet-stream"
+                }
+                
+                // Create file metadata
+                let metadata: [String: Any] = [
+                    "name": fileName,
+                    "parents": [folderId]
+                ]
+                
+                let metadataData = try JSONSerialization.data(withJSONObject: metadata)
+                
+                // Create multipart upload
+                let boundary = "Boundary-\(UUID().uuidString)"
+                var body = Data()
+                
+                // Add metadata part
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
+                body.append(metadataData)
+                body.append("\r\n".data(using: .utf8)!)
+                
+                // Add file data part
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+                body.append(data)
+                body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+                
+                // Create upload URL
+                var components = URLComponents(string: "\(GoogleAPIConfig.uploadAPIBase)/files")!
+                components.queryItems = [
+                    URLQueryItem(name: "uploadType", value: "multipart"),
+                    URLQueryItem(name: "fields", value: "id,name")
+                ]
+                
+                guard let url = components.url else {
+                    throw NSError(domain: "InvalidURL", code: -1)
+                }
+                
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+                request.setValue("multipart/related; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+                request.httpBody = body
+                
+                // Configure URLSession for better reliability
+                let config = URLSessionConfiguration.default
+                config.timeoutIntervalForRequest = 60.0 // 60 seconds
+                config.timeoutIntervalForResource = 300.0 // 5 minutes for large files
+                config.allowsCellularAccess = true
+                config.waitsForConnectivity = true
+                
+                let session = URLSession(configuration: config)
+                
+                // Simulate progress updates
+                let progressTask = Task {
+                    for progress in stride(from: 0.1, through: 0.9, by: 0.1) {
+                        try? await Task.sleep(nanoseconds: 100_000_000)
+                        await MainActor.run {
+                            uploadProgress[fileName] = progress
+                        }
                     }
                 }
+                
+                let (responseData, response) = try await session.data(for: request)
+                progressTask.cancel()
+                
+                guard let httpResponse = response as? HTTPURLResponse,
+                      httpResponse.statusCode == 200 else {
+                    throw NSError(domain: "UploadFailed", code: (response as? HTTPURLResponse)?.statusCode ?? -1)
+                }
+                
+                let uploadedFile = try JSONDecoder().decode(DriveFile.self, from: responseData)
+                
+                await MainActor.run {
+                    uploadProgress[fileName] = 1.0
+                    uploadProgress.removeValue(forKey: fileName)
+                    isUploading = uploadProgress.isEmpty
+                }
+                
+                return UploadResult(success: true, fileName: fileName, error: nil, fileId: uploadedFile.id)
+                
+            } catch {
+                lastError = error
+                print("Upload attempt \(attempt) failed: \(error.localizedDescription)")
+                
+                // If this is not the last attempt, wait before retrying
+                if attempt < maxRetries {
+                    let delay = Double(attempt) * 2.0 // Exponential backoff: 2s, 4s, 6s
+                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                }
             }
-            
-            let (responseData, response) = try await URLSession.shared.data(for: request)
-            progressTask.cancel()
-            
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                throw NSError(domain: "UploadFailed", code: (response as? HTTPURLResponse)?.statusCode ?? -1)
-            }
-            
-            let uploadedFile = try JSONDecoder().decode(DriveFile.self, from: responseData)
-            
-            await MainActor.run {
-                uploadProgress[fileName] = 1.0
-                uploadProgress.removeValue(forKey: fileName)
-                isUploading = uploadProgress.isEmpty
-            }
-            
-            return UploadResult(success: true, fileName: fileName, error: nil, fileId: uploadedFile.id)
-            
-        } catch {
-            await MainActor.run {
-                uploadProgress.removeValue(forKey: fileName)
-                isUploading = uploadProgress.isEmpty
-            }
-            
-            return UploadResult(success: false, fileName: fileName, error: error, fileId: nil)
         }
+        
+        await MainActor.run {
+            uploadProgress.removeValue(forKey: fileName)
+            isUploading = uploadProgress.isEmpty
+        }
+        
+        return UploadResult(success: false, fileName: fileName, error: lastError, fileId: nil)
     }
     
     func createFolder(name: String) async -> GoogleDriveFolder? {

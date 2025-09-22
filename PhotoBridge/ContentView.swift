@@ -670,7 +670,7 @@ struct PhotoGridViewWithFullScreen: View {
     let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
     
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             LazyVGrid(columns: columns, spacing: 1) {
                 ForEach(photoManager.assets, id: \.localIdentifier) { asset in
                     PhotoThumbnailViewSimple(
@@ -684,7 +684,9 @@ struct PhotoGridViewWithFullScreen: View {
                 }
             }
             .padding(.horizontal, 1)
+            .padding(.bottom, 20) // Add bottom padding to ensure last row is fully visible
         }
+        .scrollContentBackground(.hidden)
         .onAppear {
             print("📸 PhotoGridView: Displaying \(photoManager.assets.count) assets")
         }
@@ -711,6 +713,7 @@ struct PhotoThumbnailViewSimple: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
             } else if isLoading {
                 ProgressView()
