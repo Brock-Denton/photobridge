@@ -91,6 +91,46 @@ class PhotoLibraryManager: ObservableObject {
         }
     }
     
+    func loadMoreAssets(batchSize: Int) {
+        isLoading = true
+        
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        fetchOptions.includeHiddenAssets = false
+        
+        let allAssets = PHAsset.fetchAssets(with: fetchOptions)
+        
+        // Calculate how many more assets to load
+        let currentCount = assets.count
+        let totalCount = allAssets.count
+        let remainingCount = totalCount - currentCount
+        let loadCount = min(batchSize, remainingCount)
+        
+        guard loadCount > 0 else {
+            DispatchQueue.main.async {
+                self.isLoading = false
+                print("📸 No more photos to load")
+            }
+            return
+        }
+        
+        var newAssets: [PHAsset] = []
+        allAssets.enumerateObjects { asset, index, stop in
+            if index >= currentCount && index < currentCount + loadCount {
+                newAssets.append(asset)
+            }
+            if index >= currentCount + loadCount {
+                stop.pointee = true
+            }
+        }
+        
+        DispatchQueue.main.async {
+            self.assets.append(contentsOf: newAssets)
+            self.isLoading = false
+            print("📸 Loaded \(newAssets.count) more photos (total: \(self.assets.count))")
+        }
+    }
+    
     func toggleSelection(for asset: PHAsset) {
         let identifier = asset.localIdentifier
         if selectedAssets.contains(identifier) {

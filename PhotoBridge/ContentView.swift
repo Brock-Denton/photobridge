@@ -188,6 +188,13 @@ struct PhotoSelectionView: View {
     @State private var moveResults: [UploadResult] = []
     @State private var hasUsedSelectMore = false
     @State private var isGridView = true
+    @State private var uploadProgress: Double = 0.0
+    @State private var completedUploads: Int = 0
+    @State private var totalUploads: Int = 0
+    @State private var estimatedTimeRemaining: String?
+    @State private var uploadStartTime: Date?
+    @State private var currentBatchSize: Int = 100
+    @State private var hasLoadedMorePhotos = false
     
     var selectedCount: Int {
         let count = photoManager.selectedAssets.count
@@ -214,19 +221,42 @@ struct PhotoSelectionView: View {
                 // Bottom controls
             VStack(spacing: 16) {
                 if isMoving {
-                    // Progress indicator during upload
+                    // Enhanced progress indicator during upload
                     VStack(spacing: 12) {
-                        ProgressView()
-                            .scaleEffect(1.2)
+                        ZStack {
+                            // Background circle
+                            Circle()
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 8)
+                                .frame(width: 80, height: 80)
+                            
+                            // Progress circle
+                            Circle()
+                                .trim(from: 0, to: uploadProgress)
+                                .stroke(Color.blue, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                                .frame(width: 80, height: 80)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.easeInOut(duration: 0.5), value: uploadProgress)
+                            
+                            // Progress text
+                            VStack(spacing: 2) {
+                                Text("\(Int(uploadProgress * 100))%")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                Text("\(completedUploads)/\(totalUploads)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                         
                         Text("Moving photos to Google Drive...")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        Text("Please wait while your photos are being uploaded")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                        if let timeRemaining = estimatedTimeRemaining {
+                            Text("Est. \(timeRemaining)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -259,29 +289,31 @@ struct PhotoSelectionView: View {
                         .cornerRadius(12)
                     }
                 } else if !hasUsedSelectMore {
-                    // Select more images button - only show once
-                    Button(action: {
-                        print("📸 Select More Images button tapped!")
-                        hasUsedSelectMore = true
-                        
-                        // Back to the original simple version that worked
-                        photoManager.loadAssets()
-                        
-                        // Force UI update by clearing and reloading
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            photoManager.loadAssets()
+                    // Select more images button with batch options
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            print("📸 Load Next 100 Photos button tapped!")
+                            hasUsedSelectMore = true
+                            hasLoadedMorePhotos = true
+                            
+                            // Load next batch of photos
+                            photoManager.loadMoreAssets(batchSize: currentBatchSize)
+                        }) {
+                            HStack {
+                                Image(systemName: "photo.on.rectangle")
+                                Text("Load Next 100 Photos")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(12)
                         }
-                    }) {
-                        HStack {
-                            Image(systemName: "photo.on.rectangle")
-                            Text("Select More Images")
-                        }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.green)
-                        .cornerRadius(12)
+                        
+                        Text("Currently showing \(photoManager.assets.count) photos")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 } else {
                     // After first use, show message that they need to restart app
@@ -364,18 +396,26 @@ struct PhotoSelectionView: View {
     private func startMove(to folder: GoogleDriveFolder) {
         isMoving = true
         moveResults.removeAll()
+        uploadStartTime = Date()
+        
+        let selectedAssets = photoManager.getSelectedAssets()
+        totalUploads = selectedAssets.count
+        completedUploads = 0
+        uploadProgress = 0.0
         
         Task {
-            let selectedAssets = photoManager.getSelectedAssets()
             var allSuccessful = true
             
             // Upload each file to the selected folder
-            for asset in selectedAssets {
+            for (index, asset) in selectedAssets.enumerated() {
                 guard let data = await photoManager.getAssetData(for: asset) else {
                     let result = UploadResult(success: false, fileName: photoManager.getAssetFileName(for: asset), error: NSError(domain: "NoData", code: 0), fileId: nil)
                     await MainActor.run {
                         moveResults.append(result)
                         allSuccessful = false
+                        completedUploads += 1
+                        uploadProgress = Double(completedUploads) / Double(totalUploads)
+                        updateTimeEstimation()
                     }
                     continue
                 }
@@ -385,6 +425,10 @@ struct PhotoSelectionView: View {
                 
                 await MainActor.run {
                     moveResults.append(uploadResult)
+                    completedUploads += 1
+                    uploadProgress = Double(completedUploads) / Double(totalUploads)
+                    updateTimeEstimation()
+                    
                     if !uploadResult.success {
                         allSuccessful = false
                     }
@@ -403,7 +447,25 @@ struct PhotoSelectionView: View {
             await MainActor.run {
                 isMoving = false
                 showSuccess = true
+                uploadStartTime = nil
+                estimatedTimeRemaining = nil
             }
+        }
+    }
+    
+    private func updateTimeEstimation() {
+        guard let startTime = uploadStartTime, completedUploads > 0 else { return }
+        
+        let elapsed = Date().timeIntervalSince(startTime)
+        let averageTimePerFile = elapsed / Double(completedUploads)
+        let remainingFiles = totalUploads - completedUploads
+        let estimatedRemainingSeconds = averageTimePerFile * Double(remainingFiles)
+        
+        if estimatedRemainingSeconds < 60 {
+            estimatedTimeRemaining = "\(Int(estimatedRemainingSeconds))s"
+        } else {
+            let minutes = Int(estimatedRemainingSeconds / 60)
+            estimatedTimeRemaining = "\(minutes)m"
         }
     }
 }
