@@ -195,6 +195,7 @@ struct PhotoSelectionView: View {
     @State private var uploadStartTime: Date?
     @State private var currentBatchSize: Int = 100
     @State private var hasLoadedMorePhotos = false
+    @State private var loadingRotation: Double = 0
     
     var selectedCount: Int {
         let count = photoManager.selectedAssets.count
@@ -236,6 +237,17 @@ struct PhotoSelectionView: View {
                                 .frame(width: 80, height: 80)
                                 .rotationEffect(.degrees(-90))
                                 .animation(.easeInOut(duration: 0.5), value: uploadProgress)
+                            
+                            // Animated loading circle for 0% progress
+                            if uploadProgress == 0 {
+                                Circle()
+                                    .trim(from: 0, to: 0.3)
+                                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                                    .frame(width: 80, height: 80)
+                                    .rotationEffect(.degrees(-90))
+                                    .rotationEffect(.degrees(loadingRotation))
+                                    .animation(.linear(duration: 1.0).repeatForever(autoreverses: false), value: loadingRotation)
+                            }
                             
                             // Progress text
                             VStack(spacing: 2) {
@@ -289,31 +301,29 @@ struct PhotoSelectionView: View {
                         .cornerRadius(12)
                     }
                 } else if !hasUsedSelectMore {
-                    // Select more images button with batch options
-                    VStack(spacing: 12) {
-                        Button(action: {
-                            print("📸 Load Next 100 Photos button tapped!")
-                            hasUsedSelectMore = true
-                            hasLoadedMorePhotos = true
-                            
-                            // Load next batch of photos
-                            photoManager.loadMoreAssets(batchSize: currentBatchSize)
-                        }) {
-                            HStack {
-                                Image(systemName: "photo.on.rectangle")
-                                Text("Load Next 100 Photos")
-                            }
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.green)
-                            .cornerRadius(12)
-                        }
+                    // Select more images button - only show once
+                    Button(action: {
+                        print("📸 Select More Images button tapped!")
+                        hasUsedSelectMore = true
                         
-                        Text("Currently showing \(photoManager.assets.count) photos")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        // Back to the original simple version that worked
+                        photoManager.loadAssets()
+                        
+                        // Force UI update by clearing and reloading
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            photoManager.loadAssets()
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "photo.on.rectangle")
+                            Text("Select More Images")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .cornerRadius(12)
                     }
                 } else {
                     // After first use, show message that they need to restart app
@@ -402,6 +412,11 @@ struct PhotoSelectionView: View {
         totalUploads = selectedAssets.count
         completedUploads = 0
         uploadProgress = 0.0
+        
+        // Start loading animation
+        withAnimation(.linear(duration: 1.0).repeatForever(autoreverses: false)) {
+            loadingRotation = 360
+        }
         
         Task {
             var allSuccessful = true
@@ -746,6 +761,7 @@ struct PhotoGridViewWithFullScreen: View {
                 }
             }
             .padding(.horizontal, 1)
+            .padding(.top, 20) // Add top padding to ensure first row is fully visible
             .padding(.bottom, 20) // Add bottom padding to ensure last row is fully visible
         }
         .scrollContentBackground(.hidden)
