@@ -704,21 +704,21 @@ struct PhotoThumbnailViewSimple: View {
     private let imageManager = PHCachingImageManager()
     
     var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(Color.gray.opacity(0.3))
-                .aspectRatio(1, contentMode: .fit)
-            
-            if let image = thumbnailImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .aspectRatio(1, contentMode: .fit)
-                    .clipped()
-            } else if isLoading {
-                ProgressView()
-                    .scaleEffect(0.8)
-            }
+        GeometryReader { geometry in
+            ZStack {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                
+                if let image = thumbnailImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width, height: geometry.size.width)
+                        .clipped()
+                } else if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
             
             // Selection overlay
             if isSelected {
@@ -753,6 +753,7 @@ struct PhotoThumbnailViewSimple: View {
             }
             .padding(4)
         }
+        .aspectRatio(1, contentMode: .fit)
         .onTapGesture {
             onTap()
         }
