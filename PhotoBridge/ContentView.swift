@@ -719,39 +719,40 @@ struct PhotoThumbnailViewSimple: View {
                     ProgressView()
                         .scaleEffect(0.8)
                 }
-            
-            // Selection overlay
-            if isSelected {
-                Rectangle()
-                    .fill(Color.blue.opacity(0.3))
-                    .overlay(
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.blue)
-                            .font(.title2)
-                            .background(Color.white, in: Circle())
-                    )
-            }
-            
-            // Media type indicator
-            VStack {
-                HStack {
-                    Spacer()
-                    if asset.mediaType == .video {
-                        VStack(spacing: 2) {
-                            Image(systemName: "play.fill")
-                                .foregroundColor(.white)
-                                .font(.caption2)
-                            Text("VIDEO")
-                                .foregroundColor(.white)
-                                .font(.system(size: 8, weight: .bold))
-                        }
-                        .padding(6)
-                        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
-                    }
+                
+                // Selection overlay
+                if isSelected {
+                    Rectangle()
+                        .fill(Color.blue.opacity(0.3))
+                        .overlay(
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.blue)
+                                .font(.title2)
+                                .background(Color.white, in: Circle())
+                        )
                 }
-                Spacer()
+                
+                // Media type indicator
+                VStack {
+                    HStack {
+                        Spacer()
+                        if asset.mediaType == .video {
+                            VStack(spacing: 2) {
+                                Image(systemName: "play.fill")
+                                    .foregroundColor(.white)
+                                    .font(.caption2)
+                                Text("VIDEO")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 8, weight: .bold))
+                            }
+                            .padding(6)
+                            .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(4)
             }
-            .padding(4)
         }
         .aspectRatio(1, contentMode: .fit)
         .onTapGesture {
