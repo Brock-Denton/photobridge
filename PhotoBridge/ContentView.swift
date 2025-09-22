@@ -755,6 +755,7 @@ struct PhotoThumbnailViewSimple: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
+        .contentShape(Rectangle())
         .onTapGesture {
             onTap()
         }
