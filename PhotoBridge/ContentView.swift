@@ -196,48 +196,22 @@ struct PhotoSelectionView: View {
     }
     
     var body: some View {
+        ZStack {
             VStack(spacing: 0) {
-                // Header
-                    HStack {
-                Button(action: {
-                    isGridView.toggle()
-                }) {
-                    Image(systemName: isGridView ? "rectangle.grid.2x2" : "photo")
-                            .font(.title2)
-                            .foregroundColor(.blue)
+                // Photo display
+                if photoManager.isLoading {
+                    Spacer()
+                    ProgressView("Loading photos...")
+                    Spacer()
+                } else if isGridView {
+                    PhotoGridViewWithFullScreen(photoManager: photoManager)
+                } else {
+                    SinglePhotoView(photoManager: photoManager)
                 }
-                        
-                Text("Select Photos to Move")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        Spacer()
-                        
-                            Button("Sign Out") {
-                                driveManager.signOut()
-                            }
-                .font(.caption)
-                .foregroundColor(.red)
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            
-            Divider()
-            
-            // Photo display
-            if photoManager.isLoading {
-                Spacer()
-                ProgressView("Loading photos...")
-                Spacer()
-            } else if isGridView {
-                PhotoGridViewWithFullScreen(photoManager: photoManager)
-            } else {
-                SinglePhotoView(photoManager: photoManager)
-            }
-            
-            Divider()
-            
-            // Bottom controls
+                
+                Divider()
+                
+                // Bottom controls
             VStack(spacing: 16) {
                 if isMoving {
                     // Progress indicator during upload
@@ -325,6 +299,38 @@ struct PhotoSelectionView: View {
             }
             .padding()
             .background(Color(.systemBackground))
+            }
+            
+            // Header - positioned in front of content
+            VStack {
+                HStack {
+                    Button(action: {
+                        isGridView.toggle()
+                    }) {
+                        Image(systemName: isGridView ? "rectangle.grid.2x2" : "photo")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Text("Select Photos to Move")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Spacer()
+                    
+                    Button("Sign Out") {
+                        driveManager.signOut()
+                    }
+                    .font(.caption)
+                    .foregroundColor(.red)
+                }
+                .padding()
+                .background(Color(.systemBackground).opacity(0.95))
+                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                
+                Spacer()
+            }
+            .zIndex(1)
         }
         .sheet(isPresented: $showFolderPicker) {
             FolderPickerView(
@@ -661,11 +667,11 @@ struct SinglePhotoView: View {
 
 struct PhotoGridViewWithFullScreen: View {
     @ObservedObject var photoManager: PhotoLibraryManager
-    let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
+    let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
     
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 2) {
+            LazyVGrid(columns: columns, spacing: 1) {
                 ForEach(photoManager.assets, id: \.localIdentifier) { asset in
                     PhotoThumbnailViewSimple(
                         asset: asset,
@@ -677,7 +683,7 @@ struct PhotoGridViewWithFullScreen: View {
                     )
                 }
             }
-            .padding(.horizontal, 2)
+            .padding(.horizontal, 1)
         }
         .onAppear {
             print("📸 PhotoGridView: Displaying \(photoManager.assets.count) assets")
@@ -728,11 +734,16 @@ struct PhotoThumbnailViewSimple: View {
                 HStack {
                     Spacer()
                     if asset.mediaType == .video {
-                        Image(systemName: "play.fill")
-                            .foregroundColor(.white)
-                            .font(.caption)
-                            .padding(4)
-                            .background(Color.black.opacity(0.6), in: Circle())
+                        VStack(spacing: 2) {
+                            Image(systemName: "play.fill")
+                                .foregroundColor(.white)
+                                .font(.caption2)
+                            Text("VIDEO")
+                                .foregroundColor(.white)
+                                .font(.system(size: 8, weight: .bold))
+                        }
+                        .padding(6)
+                        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
                 Spacer()

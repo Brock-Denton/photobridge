@@ -227,6 +227,20 @@ class GoogleDriveManager: ObservableObject {
         isUploading = true
         
         do {
+            // Determine MIME type based on file extension
+            let mimeType: String
+            if fileName.lowercased().hasSuffix(".mov") {
+                mimeType = "video/quicktime"
+            } else if fileName.lowercased().hasSuffix(".mp4") {
+                mimeType = "video/mp4"
+            } else if fileName.lowercased().hasSuffix(".jpg") || fileName.lowercased().hasSuffix(".jpeg") {
+                mimeType = "image/jpeg"
+            } else if fileName.lowercased().hasSuffix(".png") {
+                mimeType = "image/png"
+            } else {
+                mimeType = "application/octet-stream"
+            }
+            
             // Create file metadata
             let metadata: [String: Any] = [
                 "name": fileName,
@@ -247,7 +261,7 @@ class GoogleDriveManager: ObservableObject {
             
             // Add file data part
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+            body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
             body.append(data)
             body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
             
@@ -315,6 +329,20 @@ class GoogleDriveManager: ObservableObject {
         isUploading = true
         
         do {
+            // Determine MIME type based on file extension
+            let mimeType: String
+            if fileName.lowercased().hasSuffix(".mov") {
+                mimeType = "video/quicktime"
+            } else if fileName.lowercased().hasSuffix(".mp4") {
+                mimeType = "video/mp4"
+            } else if fileName.lowercased().hasSuffix(".jpg") || fileName.lowercased().hasSuffix(".jpeg") {
+                mimeType = "image/jpeg"
+            } else if fileName.lowercased().hasSuffix(".png") {
+                mimeType = "image/png"
+            } else {
+                mimeType = "application/octet-stream"
+            }
+            
             // Create file metadata
             let metadata: [String: Any] = [
                 "name": fileName,
@@ -335,7 +363,7 @@ class GoogleDriveManager: ObservableObject {
             
             // Add file data part
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+            body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
             body.append(data)
             body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
             
