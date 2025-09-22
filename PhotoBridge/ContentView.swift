@@ -713,7 +713,7 @@ struct PhotoThumbnailViewSimple: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .aspectRatio(1, contentMode: .fit)
                     .clipped()
             } else if isLoading {
                 ProgressView()

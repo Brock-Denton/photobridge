@@ -144,16 +144,23 @@ class PhotoLibraryManager: ObservableObject {
                     continuation.resume(returning: data)
                 }
             } else if asset.mediaType == .video {
-                imageManager.requestAVAsset(forVideo: asset, options: nil) { avAsset, _, _ in
+                let videoOptions = PHVideoRequestOptions()
+                videoOptions.isNetworkAccessAllowed = true
+                videoOptions.deliveryMode = .highQualityFormat
+                
+                imageManager.requestAVAsset(forVideo: asset, options: videoOptions) { avAsset, _, _ in
                     guard let urlAsset = avAsset as? AVURLAsset else {
+                        print("❌ Failed to get URL asset for video")
                         continuation.resume(returning: nil)
                         return
                     }
                     
                     do {
                         let data = try Data(contentsOf: urlAsset.url)
+                        print("✅ Successfully extracted video data: \(data.count) bytes")
                         continuation.resume(returning: data)
                     } catch {
+                        print("❌ Failed to read video data: \(error.localizedDescription)")
                         continuation.resume(returning: nil)
                     }
                 }
@@ -171,6 +178,18 @@ class PhotoLibraryManager: ObservableObject {
         if asset.mediaType == .image {
             return "IMG_\(dateString).jpg"
         } else if asset.mediaType == .video {
+            // Try to determine the actual video format
+            if let resource = PHAssetResource.assetResources(for: asset).first {
+                let originalFilename = resource.originalFilename
+                if originalFilename.lowercased().hasSuffix(".mp4") {
+                    return "VID_\(dateString).mp4"
+                } else if originalFilename.lowercased().hasSuffix(".mov") {
+                    return "VID_\(dateString).mov"
+                } else if originalFilename.lowercased().hasSuffix(".m4v") {
+                    return "VID_\(dateString).m4v"
+                }
+            }
+            // Default to .mov if we can't determine the format
             return "VID_\(dateString).mov"
         }
         
