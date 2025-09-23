@@ -128,6 +128,10 @@ class LocalStorageManager: ObservableObject {
         print("📁 Stored \(newPhotos.count) photos in '\(folderName)' folder")
     }
     
+    func isFolderNameUnique(_ folderName: String) -> Bool {
+        return !storedFolders.contains { $0.name.lowercased() == folderName.lowercased() }
+    }
+    
     func removePhotosFromStorage(_ assetIds: [String]) {
         storedPhotos.removeAll { photo in
             assetIds.contains(photo.assetId)

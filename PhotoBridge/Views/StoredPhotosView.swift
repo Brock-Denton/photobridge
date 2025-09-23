@@ -13,6 +13,8 @@ struct StoredPhotosView: View {
     @ObservedObject var photoManager: PhotoLibraryManager
     @ObservedObject var driveManager: GoogleDriveManager
     
+    @Environment(\.dismiss) private var dismiss
+    
     @State private var showCreateFolder = false
     @State private var newFolderName = ""
     @State private var selectedFolderColor = StoredPhoto.FolderColor.green
@@ -27,6 +29,9 @@ struct StoredPhotosView: View {
     @State private var estimatedTimeRemaining: String?
     @State private var uploadStartTime: Date?
     @State private var folderToMove: StoredFolder?
+    @State private var selectedFolderForMove: StoredFolder?
+    @State private var showDeleteAlert = false
+    @State private var folderToDelete: StoredFolder?
     
     var body: some View {
         NavigationView {
@@ -68,17 +73,88 @@ struct StoredPhotosView: View {
                         
                         Spacer()
                     }
+                } else if isMoving {
+                    // Progress view during move
+                    VStack(spacing: 20) {
+                        Spacer()
+                        
+                        ZStack {
+                            // Background circle
+                            Circle()
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 8)
+                                .frame(width: 80, height: 80)
+                            
+                            // Progress circle
+                            Circle()
+                                .trim(from: 0, to: uploadProgress)
+                                .stroke(Color.green, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                                .frame(width: 80, height: 80)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.easeInOut(duration: 0.5), value: uploadProgress)
+                            
+                            // Progress text
+                            VStack(spacing: 2) {
+                                Text("\(Int(uploadProgress * 100))%")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                Text("\(completedUploads)/\(totalUploads)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Text("Moving photos to Google Drive...")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        if let timeRemaining = estimatedTimeRemaining {
+                            Text("Est. \(timeRemaining)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
                 } else {
                     List {
                         ForEach(storageManager.storedFolders) { folder in
-                            FolderRowView(
+                            FolderSelectionRow(
                                 folder: folder,
-                                onMoveAll: { moveFolder(folder) },
-                                onViewPhotos: { viewFolderPhotos(folder) },
-                                onDeleteFolder: { deleteFolder(folder) }
+                                isSelected: selectedFolderForMove?.id == folder.id,
+                                onSelect: { 
+                                    selectedFolderForMove = folder
+                                }
                             )
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    folderToDelete = folder
+                                    showDeleteAlert = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     }
+                }
+                
+                // Move Button (when folder is selected and not moving)
+                if let selectedFolder = selectedFolderForMove, !isMoving {
+                    Divider()
+                    
+                    Button(action: { moveSelectedFolder() }) {
+                        HStack {
+                            Image(systemName: "icloud.and.arrow.up")
+                            Text("Move '\(selectedFolder.name)' to Google Drive")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .cornerRadius(12)
+                    }
+                    .padding()
                 }
                 
                 // Create New Folder Button
@@ -105,7 +181,7 @@ struct StoredPhotosView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Done") {
-                        // This will be handled by the parent view
+                        dismiss()
                     }
                 }
             }
@@ -127,38 +203,75 @@ struct StoredPhotosView: View {
                     startMoveFolder(to: folder)
                 }
             )
+            .onDisappear {
+                // Reset state when sheet is dismissed
+                if !showFolderPicker {
+                    selectedFolder = nil
+                }
+            }
         }
         .alert("Move Complete", isPresented: $showSuccess) {
-            Button("OK") {
-                moveResults.removeAll()
+            let successCount = moveResults.filter { $0.success }.count
+            let totalCount = moveResults.count
+            
+            if successCount == totalCount {
+                Button("Delete from Camera Roll") {
+                    // Photos were already deleted in the move process
+                    moveResults.removeAll()
+                    selectedFolderForMove = nil
+                }
+                Button("OK") {
+                    moveResults.removeAll()
+                    selectedFolderForMove = nil
+                }
+            } else {
+                Button("OK") {
+                    moveResults.removeAll()
+                    selectedFolderForMove = nil
+                }
             }
         } message: {
             let successCount = moveResults.filter { $0.success }.count
             let totalCount = moveResults.count
             
             if successCount == totalCount {
-                Text("\(totalCount) photos moved successfully!")
+                Text("\(totalCount) photos moved successfully! They have been deleted from your camera roll.")
             } else {
-                Text("\(successCount) of \(totalCount) photos moved successfully.")
+                Text("\(successCount) of \(totalCount) photos moved successfully. No photos were deleted from your camera roll.")
+            }
+        }
+        .alert("Delete Folder", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                if let folder = folderToDelete {
+                    deleteFolder(folder)
+                }
+                folderToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                folderToDelete = nil
+            }
+        } message: {
+            if let folder = folderToDelete {
+                Text("Are you sure you want to delete the '\(folder.name)' folder? This will remove \(folder.photoCount) photos from storage and clear their folder colors, but won't delete them from your camera roll.")
             }
         }
     }
     
     // MARK: - Actions
     
-    private func moveFolder(_ folder: StoredFolder) {
-        // Store the folder to move for later use
-        folderToMove = folder
+    private func moveSelectedFolder() {
+        guard let selectedFolder = selectedFolderForMove else { return }
+        folderToMove = selectedFolder
         showFolderPicker = true
-    }
-    
-    private func viewFolderPhotos(_ folder: StoredFolder) {
-        // This could show a detailed view of photos in the folder
-        print("Viewing photos in folder: \(folder.name)")
     }
     
     private func deleteFolder(_ folder: StoredFolder) {
         storageManager.clearFolder(folder.name)
+        
+        // Clear selection if this folder was selected
+        if selectedFolderForMove?.id == folder.id {
+            selectedFolderForMove = nil
+        }
     }
     
     private func startMoveFolder(to googleDriveFolder: GoogleDriveFolder) {
@@ -244,16 +357,13 @@ struct StoredPhotosView: View {
     }
 }
 
-struct FolderRowView: View {
+struct FolderSelectionRow: View {
     let folder: StoredFolder
-    let onMoveAll: () -> Void
-    let onViewPhotos: () -> Void
-    let onDeleteFolder: () -> Void
-    
-    @State private var showDeleteAlert = false
+    let isSelected: Bool
+    let onSelect: () -> Void
     
     var body: some View {
-        VStack(spacing: 12) {
+        Button(action: onSelect) {
             HStack {
                 // Folder icon with color
                 Image(systemName: folder.color.icon)
@@ -277,37 +387,18 @@ struct FolderRowView: View {
                 
                 Spacer()
                 
-                // Action buttons
-                HStack(spacing: 12) {
-                    Button(action: onViewPhotos) {
-                        Image(systemName: "eye")
-                            .font(.title3)
-                            .foregroundColor(.blue)
-                    }
-                    
-                    Button(action: onMoveAll) {
-                        Image(systemName: "icloud.and.arrow.up")
-                            .font(.title3)
-                            .foregroundColor(.green)
-                    }
-                    
-                    Button(action: { showDeleteAlert = true }) {
-                        Image(systemName: "trash")
-                            .font(.title3)
-                            .foregroundColor(.red)
-                    }
+                // Selection indicator
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.blue)
                 }
             }
+            .padding(.vertical, 8)
+            .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
+            .cornerRadius(8)
         }
-        .padding(.vertical, 8)
-        .alert("Delete Folder", isPresented: $showDeleteAlert) {
-            Button("Delete", role: .destructive) {
-                onDeleteFolder()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Are you sure you want to delete the '\(folder.name)' folder? This will remove \(folder.photoCount) photos from storage but won't delete them from your camera roll.")
-        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -316,13 +407,20 @@ struct CreateFolderView: View {
     @ObservedObject var photoManager: PhotoLibraryManager
     
     let onDismiss: () -> Void
+    let onStore: () -> Void
     
     @State private var folderName = ""
     @State private var selectedColor = StoredPhoto.FolderColor.green
+    @State private var showDuplicateNameAlert = false
+    @State private var selectedExistingFolder: StoredFolder?
     @Environment(\.dismiss) private var dismiss
     
     var selectedCount: Int {
         photoManager.selectedAssets.count
+    }
+    
+    var canStorePhotos: Bool {
+        return selectedExistingFolder != nil || !folderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     
     var body: some View {
@@ -341,27 +439,75 @@ struct CreateFolderView: View {
                 .padding(.top)
                 
                 VStack(spacing: 16) {
-                    // Folder name input
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Folder Name")
-                            .font(.headline)
+                    // Existing folders section
+                    if !storageManager.storedFolders.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Add to Existing Folder")
+                                .font(.headline)
+                            
+                            List {
+                                ForEach(storageManager.storedFolders) { folder in
+                                    HStack {
+                                        Image(systemName: folder.color.icon)
+                                            .font(.title3)
+                                            .foregroundColor(folder.color.color)
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(folder.name)
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                            Text("\(folder.photoCount) photos")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        if selectedExistingFolder?.id == folder.id {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundColor(.blue)
+                                        }
+                                    }
+                                    .padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        selectedExistingFolder = folder
+                                        folderName = "" // Clear new folder name
+                                    }
+                                }
+                            }
+                            .frame(height: 120)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                        }
                         
-                        TextField("Enter folder name", text: $folderName)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        Divider()
+                            .padding(.vertical, 8)
                     }
                     
-                    // Color selection
+                    // OR Create new folder section
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Folder Color")
+                        Text("OR Create New Folder")
                             .font(.headline)
                         
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
-                            ForEach(StoredPhoto.FolderColor.allCases, id: \.self) { color in
-                                ColorOptionView(
-                                    color: color,
-                                    isSelected: selectedColor == color
-                                ) {
-                                    selectedColor = color
+                        // Folder name input
+                        TextField("Enter folder name", text: $folderName)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .onTapGesture {
+                                selectedExistingFolder = nil // Clear existing folder selection
+                            }
+                        
+                        // Color selection (only show if creating new folder)
+                        if selectedExistingFolder == nil {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
+                                ForEach(StoredPhoto.FolderColor.allCases, id: \.self) { color in
+                                    ColorOptionView(
+                                        color: color,
+                                        isSelected: selectedColor == color
+                                    ) {
+                                        selectedColor = color
+                                        selectedExistingFolder = nil // Clear existing folder selection
+                                    }
                                 }
                             }
                         }
@@ -371,20 +517,20 @@ struct CreateFolderView: View {
                 
                 Spacer()
                 
-                // Create button
-                Button(action: createFolder) {
+                // Store button
+                Button(action: storePhotos) {
                     HStack {
-                        Image(systemName: "folder.badge.plus")
-                        Text("Create Folder")
+                        Image(systemName: selectedExistingFolder != nil ? "folder.fill" : "folder.badge.plus")
+                        Text(selectedExistingFolder != nil ? "Add to '\(selectedExistingFolder!.name)'" : "Create Folder")
                     }
                     .font(.headline)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(folderName.isEmpty ? Color.gray : Color.blue)
+                    .background(canStorePhotos ? (selectedExistingFolder != nil ? Color.orange : Color.blue) : Color.gray)
                     .cornerRadius(12)
                 }
-                .disabled(folderName.isEmpty)
+                .disabled(!canStorePhotos)
                 .padding(.horizontal)
                 .padding(.bottom)
             }
@@ -397,21 +543,39 @@ struct CreateFolderView: View {
                     }
                 }
             }
+            .alert("Folder Name Already Exists", isPresented: $showDuplicateNameAlert) {
+                Button("OK") { }
+            } message: {
+                Text("A folder with this name already exists. Please choose a different name.")
+            }
         }
     }
     
-    private func createFolder() {
-        guard !folderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        
+    private func storePhotos() {
         let assetIds = photoManager.getSelectedAssetIds()
-        storageManager.storePhotos(assetIds, in: folderName, with: selectedColor)
         
-        // Clear selection
-        photoManager.clearSelection()
+        if let existingFolder = selectedExistingFolder {
+            // Add to existing folder
+            storageManager.storePhotos(assetIds, in: existingFolder.name, with: existingFolder.color)
+        } else {
+            // Create new folder
+            let trimmedName = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedName.isEmpty else { return }
+            
+            guard storageManager.isFolderNameUnique(trimmedName) else {
+                showDuplicateNameAlert = true
+                return
+            }
+            
+            storageManager.storePhotos(assetIds, in: trimmedName, with: selectedColor)
+        }
         
         // Dismiss
         dismiss()
         onDismiss()
+        
+        // Trigger store workflow
+        onStore()
     }
 }
 

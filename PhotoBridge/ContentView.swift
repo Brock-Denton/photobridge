@@ -200,6 +200,8 @@ struct PhotoSelectionView: View {
     @State private var loadingRotation: Double = 0
     @State private var showStoredPhotos = false
     @State private var showCreateFolder = false
+    @State private var showStoreSuccess = false
+    @State private var storeResults: [UploadResult] = []
     
     var selectedCount: Int {
         let count = photoManager.selectedAssets.count
@@ -449,7 +451,8 @@ struct PhotoSelectionView: View {
             CreateFolderView(
                 storageManager: storageManager,
                 photoManager: photoManager,
-                onDismiss: { showCreateFolder = false }
+                onDismiss: { showCreateFolder = false },
+                onStore: { startStore() }
             )
         }
         .alert("Move Complete", isPresented: $showSuccess) {
@@ -466,6 +469,21 @@ struct PhotoSelectionView: View {
                 Text("\(totalCount) photos deleted and moved to Drive!")
             } else {
                 Text("\(successCount) of \(totalCount) photos moved successfully. No photos were deleted.")
+            }
+        }
+        .alert("Store Complete", isPresented: $showStoreSuccess) {
+            Button("OK") {
+                storeResults.removeAll()
+                photoManager.clearSelection()
+            }
+        } message: {
+            let successCount = storeResults.filter { $0.success }.count
+            let totalCount = storeResults.count
+            
+            if successCount == totalCount {
+                Text("\(totalCount) photos stored successfully!")
+            } else {
+                Text("\(successCount) of \(totalCount) photos stored successfully.")
             }
         }
     }
@@ -550,6 +568,18 @@ struct PhotoSelectionView: View {
             let minutes = Int(estimatedRemainingSeconds / 60)
             estimatedTimeRemaining = "\(minutes)m"
         }
+    }
+    
+    private func startStore() {
+        let selectedAssets = photoManager.getSelectedAssets()
+        
+        // Store results for the success alert
+        storeResults = selectedAssets.map { asset in
+            UploadResult(success: true, fileName: photoManager.getAssetFileName(for: asset), error: nil, fileId: nil)
+        }
+        
+        // Show success alert immediately
+        showStoreSuccess = true
     }
 }
 
