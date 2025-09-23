@@ -464,6 +464,7 @@ struct PhotoSelectionView: View {
                 showSuccess = true
                 uploadStartTime = nil
                 estimatedTimeRemaining = nil
+                loadingRotation = 0 // Reset animation state
             }
         }
     }
@@ -649,6 +650,30 @@ struct SinglePhotoView: View {
                             )
                     }
                 }
+                
+                // Video indicator
+                if !photoManager.assets.isEmpty {
+                    let currentAsset = photoManager.assets[currentIndex]
+                    if currentAsset.mediaType == .video {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                VStack(spacing: 4) {
+                                    Image(systemName: "play.fill")
+                                        .foregroundColor(.white)
+                                        .font(.title3)
+                                    Text("VIDEO")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 12, weight: .bold))
+                                }
+                                .padding(12)
+                                .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 12))
+                            }
+                            Spacer()
+                        }
+                        .padding(20)
+                    }
+                }
             }
             .onTapGesture {
                 if !photoManager.assets.isEmpty {
@@ -761,7 +786,7 @@ struct PhotoGridViewWithFullScreen: View {
                 }
             }
             .padding(.horizontal, 1)
-            .padding(.top, 20) // Add top padding to ensure first row is fully visible
+            .padding(.top, 60) // Increased top padding to account for header height
             .padding(.bottom, 20) // Add bottom padding to ensure last row is fully visible
         }
         .scrollContentBackground(.hidden)
