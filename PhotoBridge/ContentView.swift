@@ -11,6 +11,7 @@ import Photos
 struct ContentView: View {
     @StateObject private var photoManager = PhotoLibraryManager()
     @StateObject private var driveManager = GoogleDriveManager()
+    @StateObject private var storageManager = LocalStorageManager()
     
     var body: some View {
         NavigationView {
@@ -23,7 +24,7 @@ struct ContentView: View {
                     PhotoAccessView(photoManager: photoManager)
                 } else {
                     // Main photo selection and move workflow
-                    PhotoSelectionView(photoManager: photoManager, driveManager: driveManager)
+                    PhotoSelectionView(photoManager: photoManager, driveManager: driveManager, storageManager: storageManager)
                 }
             }
         }
@@ -180,6 +181,7 @@ struct PhotoAccessView: View {
 struct PhotoSelectionView: View {
     @ObservedObject var photoManager: PhotoLibraryManager
     @ObservedObject var driveManager: GoogleDriveManager
+    @ObservedObject var storageManager: LocalStorageManager
     
     @State private var showFolderPicker = false
     @State private var selectedFolder: GoogleDriveFolder?
@@ -196,6 +198,8 @@ struct PhotoSelectionView: View {
     @State private var currentBatchSize: Int = 100
     @State private var hasLoadedMorePhotos = false
     @State private var loadingRotation: Double = 0
+    @State private var showStoredPhotos = false
+    @State private var showCreateFolder = false
     
     var selectedCount: Int {
         let count = photoManager.selectedAssets.count
@@ -212,9 +216,9 @@ struct PhotoSelectionView: View {
                     ProgressView("Loading photos...")
                     Spacer()
                 } else if isGridView {
-                    PhotoGridViewWithFullScreen(photoManager: photoManager)
+                    PhotoGridViewWithFullScreen(photoManager: photoManager, storageManager: storageManager)
                 } else {
-                    SinglePhotoView(photoManager: photoManager)
+                    SinglePhotoView(photoManager: photoManager, storageManager: storageManager)
                 }
                 
                 Divider()
@@ -288,17 +292,32 @@ struct PhotoSelectionView: View {
                         .font(.caption)
                     }
                     
-                    Button(action: { showFolderPicker = true }) {
-                        HStack {
-                            Image(systemName: "folder.badge.plus")
-                            Text("Move")
+                    HStack(spacing: 12) {
+                        Button(action: { showCreateFolder = true }) {
+                            HStack {
+                                Image(systemName: "folder.badge.plus")
+                                Text("Store")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(12)
                         }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
+                        
+                        Button(action: { showFolderPicker = true }) {
+                            HStack {
+                                Image(systemName: "icloud.and.arrow.up")
+                                Text("Move")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                        }
                     }
                 } else if !hasUsedSelectMore {
                     // Select more images button - only show once
@@ -326,16 +345,32 @@ struct PhotoSelectionView: View {
                         .cornerRadius(12)
                     }
                 } else {
-                    // After first use, show message that they need to restart app
-                    VStack(spacing: 8) {
-                        Text("Restart App to select more photos")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Text("Close and reopen PhotoBridge to refresh the photo selection")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                    // Show stored photos button if there are any stored folders
+                    if !storageManager.storedFolders.isEmpty {
+                        Button(action: { showStoredPhotos = true }) {
+                            HStack {
+                                Image(systemName: "folder.fill")
+                                Text("View Stored Photos (\(storageManager.storedFolders.count) folders)")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .cornerRadius(12)
+                        }
+                    } else {
+                        // After first use, show message that they need to restart app
+                        VStack(spacing: 8) {
+                            Text("Restart App to select more photos")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            Text("Close and reopen PhotoBridge to refresh the photo selection")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
                     }
                 }
             }
@@ -360,6 +395,24 @@ struct PhotoSelectionView: View {
                     
                     Spacer()
                     
+                    // Stored photos indicator
+                    if !storageManager.storedFolders.isEmpty {
+                        Button(action: { showStoredPhotos = true }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "folder.fill")
+                                    .font(.caption)
+                                Text("\(storageManager.storedFolders.count)")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                            }
+                            .foregroundColor(.orange)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.orange.opacity(0.2))
+                            .cornerRadius(8)
+                        }
+                    }
+                    
                     Button("Sign Out") {
                         driveManager.signOut()
                     }
@@ -383,6 +436,20 @@ struct PhotoSelectionView: View {
                     showFolderPicker = false
                     startMove(to: folder)
                 }
+            )
+        }
+        .sheet(isPresented: $showStoredPhotos) {
+            StoredPhotosView(
+                storageManager: storageManager,
+                photoManager: photoManager,
+                driveManager: driveManager
+            )
+        }
+        .sheet(isPresented: $showCreateFolder) {
+            CreateFolderView(
+                storageManager: storageManager,
+                photoManager: photoManager,
+                onDismiss: { showCreateFolder = false }
             )
         }
         .alert("Move Complete", isPresented: $showSuccess) {
@@ -615,6 +682,7 @@ struct FolderPickerView: View {
 
 struct SinglePhotoView: View {
     @ObservedObject var photoManager: PhotoLibraryManager
+    @ObservedObject var storageManager: LocalStorageManager
     @State private var currentIndex = 0
     @State private var currentImage: UIImage?
     @State private var isLoading = true
@@ -648,6 +716,12 @@ struct SinglePhotoView: View {
                                     .font(.largeTitle)
                                     .background(Color.white, in: Circle())
                             )
+                    }
+                    
+                    // Folder color indicator
+                    if let folderColor = storageManager.getPhotoFolderColor(currentAsset.localIdentifier) {
+                        Rectangle()
+                            .stroke(folderColor.color, lineWidth: 4)
                     }
                 }
                 
@@ -769,6 +843,7 @@ struct SinglePhotoView: View {
 
 struct PhotoGridViewWithFullScreen: View {
     @ObservedObject var photoManager: PhotoLibraryManager
+    @ObservedObject var storageManager: LocalStorageManager
     let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
     
     var body: some View {
@@ -781,7 +856,8 @@ struct PhotoGridViewWithFullScreen: View {
                         onTap: {
                             print("📸 PhotoGridView: Asset tapped - \(asset.localIdentifier)")
                             photoManager.toggleSelection(for: asset)
-                        }
+                        },
+                        folderColor: storageManager.getPhotoFolderColor(asset.localIdentifier)
                     )
                 }
             }
@@ -800,6 +876,7 @@ struct PhotoThumbnailViewSimple: View {
     let asset: PHAsset
     let isSelected: Bool
     let onTap: () -> Void
+    let folderColor: StoredPhoto.FolderColor?
     
     @State private var thumbnailImage: UIImage?
     @State private var isLoading = true
@@ -833,6 +910,12 @@ struct PhotoThumbnailViewSimple: View {
                                 .font(.title2)
                                 .background(Color.white, in: Circle())
                         )
+                }
+                
+                // Folder color indicator (border)
+                if let folderColor = folderColor {
+                    Rectangle()
+                        .stroke(folderColor.color, lineWidth: 3)
                 }
                 
                 // Media type indicator

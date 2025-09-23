@@ -235,6 +235,16 @@ class PhotoLibraryManager: ObservableObject {
         
         return "FILE_\(dateString)"
     }
+    
+    // MARK: - Storage Integration Methods
+    
+    func getSelectedAssetIds() -> [String] {
+        return Array(selectedAssets)
+    }
+    
+    func getAssetsByIds(_ assetIds: [String]) -> [PHAsset] {
+        return assets.filter { assetIds.contains($0.localIdentifier) }
+    }
 }
 
 import AVFoundation
