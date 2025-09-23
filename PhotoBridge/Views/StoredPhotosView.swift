@@ -178,13 +178,13 @@ struct StoredPhotosView: View {
             }
             .navigationTitle("Stored Photos")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(content: {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Done") {
                         dismiss()
                     }
                 }
-            }
+            })
         }
         .sheet(isPresented: $showCreateFolder) {
             CreateFolderView(
