@@ -178,6 +178,7 @@ struct StoredPhotosView: View {
             }
             .navigationTitle("Stored Photos")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
             .toolbar(content: {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Done") {
