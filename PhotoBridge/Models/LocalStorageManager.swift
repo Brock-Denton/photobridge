@@ -169,7 +169,7 @@ class LocalStorageManager: ObservableObject {
         return storedPhotos.filter { $0.folderName == folderName }
     }
     
-    func getPhotosInFolder(_ folderName: String) -> [String] {
+    func getPhotoIdsInFolder(_ folderName: String) -> [String] {
         return getPhotosInFolder(folderName).map { $0.assetId }
     }
     

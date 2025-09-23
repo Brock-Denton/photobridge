@@ -168,7 +168,7 @@ struct StoredPhotosView: View {
         moveResults.removeAll()
         uploadStartTime = Date()
         
-        let assetIds = storageManager.getPhotosInFolder(folder.name)
+        let assetIds = storageManager.getPhotoIdsInFolder(folder.name)
         let assets = photoManager.getAssetsByIds(assetIds)
         totalUploads = assets.count
         completedUploads = 0
