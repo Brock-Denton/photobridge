@@ -85,6 +85,11 @@ struct StoredPhotosView: View {
                                 onViewPhotos: { viewFolderPhotos(folder) },
                                 onDeleteFolder: { deleteFolder(folder) }
                             )
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button("Delete", role: .destructive) {
+                                    deleteFolder(folder)
+                                }
+                            }
                         }
                     }
                 }
@@ -281,7 +286,6 @@ struct FolderRowView: View {
     let onViewPhotos: () -> Void
     let onDeleteFolder: () -> Void
     
-    @State private var showDeleteAlert = false
     
     var body: some View {
         VStack(spacing: 12) {
@@ -315,12 +319,6 @@ struct FolderRowView: View {
                             .font(.title3)
                             .foregroundColor(.blue)
                     }
-                    
-                    Button(action: { showDeleteAlert = true }) {
-                        Image(systemName: "trash")
-                            .font(.title3)
-                            .foregroundColor(.red)
-                    }
                 }
             }
         }
@@ -331,14 +329,6 @@ struct FolderRowView: View {
         )
         .onTapGesture {
             onTap()
-        }
-        .alert("Delete Folder", isPresented: $showDeleteAlert) {
-            Button("Delete", role: .destructive) {
-                onDeleteFolder()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Are you sure you want to delete the '\(folder.name)' folder? This will remove \(folder.photoCount) photos from storage but won't delete them from your camera roll.")
         }
     }
 }
