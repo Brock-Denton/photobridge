@@ -235,6 +235,11 @@ struct StoredPhotosView: View {
             estimatedTimeRemaining = "\(minutes)m"
         }
     }
+    
+    private func moveFolder(_ folder: StoredFolder) {
+        folderToMove = folder
+        showFolderPicker = true
+    }
 }
 
 struct FolderRowView: View {
@@ -309,13 +314,20 @@ struct CreateFolderView: View {
     @ObservedObject var photoManager: PhotoLibraryManager
     
     let onDismiss: () -> Void
+    let onStore: () -> Void
     
     @State private var folderName = ""
     @State private var selectedColor = StoredPhoto.FolderColor.green
+    @State private var showDuplicateNameAlert = false
+    @State private var selectedExistingFolder: StoredFolder?
     @Environment(\.dismiss) private var dismiss
     
     var selectedCount: Int {
         photoManager.selectedAssets.count
+    }
+    
+    var canStorePhotos: Bool {
+        return selectedExistingFolder != nil || !folderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     
     var body: some View {
@@ -334,13 +346,62 @@ struct CreateFolderView: View {
                 .padding(.top)
                 
                 VStack(spacing: 16) {
-                    // Folder name input
+                    // Add to existing folder section
+                    if !storageManager.storedFolders.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Add to Existing Folder")
+                                .font(.headline)
+                            
+                            ForEach(storageManager.storedFolders) { folder in
+                                HStack {
+                                    Image(systemName: "folder.fill")
+                                        .foregroundColor(folder.color.color)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(folder.displayName)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                        
+                                        Text("\(folder.photoCount) photos")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if selectedExistingFolder?.id == folder.id {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(selectedExistingFolder?.id == folder.id ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
+                                )
+                                .onTapGesture {
+                                    if selectedExistingFolder?.id == folder.id {
+                                        selectedExistingFolder = nil
+                                    } else {
+                                        selectedExistingFolder = folder
+                                        folderName = "" // Clear new folder name
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                    }
+                    
+                    // Folder name input (for new folders)
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Folder Name")
+                        Text(selectedExistingFolder == nil ? "Folder Name" : "Or Create New Folder")
                             .font(.headline)
                         
                         TextField("Enter folder name", text: $folderName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .disabled(selectedExistingFolder != nil)
                     }
                     
                     // Color selection
@@ -364,20 +425,20 @@ struct CreateFolderView: View {
                 
                 Spacer()
                 
-                // Create button
-                Button(action: createFolder) {
+                // Store button
+                Button(action: storePhotos) {
                     HStack {
-                        Image(systemName: "folder.badge.plus")
-                        Text("Create Folder")
+                        Image(systemName: selectedExistingFolder != nil ? "folder.badge.plus" : "folder.badge.plus")
+                        Text(selectedExistingFolder != nil ? "Add to Folder" : "Create & Store")
                     }
                     .font(.headline)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(folderName.isEmpty ? Color.gray : Color.blue)
+                    .background(canStorePhotos ? Color.blue : Color.gray)
                     .cornerRadius(12)
                 }
-                .disabled(folderName.isEmpty)
+                .disabled(!canStorePhotos)
                 .padding(.horizontal)
                 .padding(.bottom)
             }
@@ -390,21 +451,39 @@ struct CreateFolderView: View {
                     }
                 }
             }
+            .alert("Folder Name Already Exists", isPresented: $showDuplicateNameAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("A folder with this name already exists. Please choose a different name.")
+            }
         }
     }
     
-    private func createFolder() {
-        guard !folderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        
+    private func storePhotos() {
         let assetIds = photoManager.getSelectedAssetIds()
-        storageManager.storePhotos(assetIds, in: folderName, with: selectedColor)
         
-        // Clear selection
-        photoManager.clearSelection()
+        if let existingFolder = selectedExistingFolder {
+            // Add to existing folder
+            storageManager.storePhotos(assetIds, in: existingFolder.name, with: existingFolder.color)
+        } else {
+            // Create new folder
+            let trimmedName = folderName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedName.isEmpty else { return }
+            
+            guard storageManager.isFolderNameUnique(trimmedName) else {
+                showDuplicateNameAlert = true
+                return
+            }
+            
+            storageManager.storePhotos(assetIds, in: trimmedName, with: selectedColor)
+        }
         
         // Dismiss
         dismiss()
         onDismiss()
+        
+        // Trigger store workflow
+        onStore()
     }
 }
 

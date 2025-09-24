@@ -293,7 +293,7 @@ struct PhotoSelectionView: View {
                     }
                     
                     HStack(spacing: 12) {
-                        Button(action: { showCreateFolder = true }) {
+                        Button(action: startStore) {
                             HStack {
                                 Image(systemName: "folder.badge.plus")
                                 Text("Store")
@@ -845,6 +845,10 @@ struct SinglePhotoView: View {
         // iPhone screenshots are usually around 0.46-0.56 (portrait) or 1.8-2.2 (landscape)
         // Regular photos are usually more square (0.7-1.4)
         return aspectRatio < 0.6 || aspectRatio > 1.6
+    }
+    
+    private func startStore() {
+        showCreateFolder = true
     }
 }
 
