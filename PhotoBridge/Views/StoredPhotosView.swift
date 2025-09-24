@@ -27,6 +27,7 @@ struct StoredPhotosView: View {
     @State private var estimatedTimeRemaining: String?
     @State private var uploadStartTime: Date?
     @State private var folderToMove: StoredFolder?
+    @State private var selectedFolderForMove: StoredFolder?
     
     var body: some View {
         NavigationView {
@@ -73,7 +74,14 @@ struct StoredPhotosView: View {
                         ForEach(storageManager.storedFolders) { folder in
                             FolderRowView(
                                 folder: folder,
-                                onMoveAll: { moveFolder(folder) },
+                                isSelected: selectedFolderForMove?.id == folder.id,
+                                onTap: { 
+                                    if selectedFolderForMove?.id == folder.id {
+                                        selectedFolderForMove = nil
+                                    } else {
+                                        selectedFolderForMove = folder
+                                    }
+                                },
                                 onViewPhotos: { viewFolderPhotos(folder) },
                                 onDeleteFolder: { deleteFolder(folder) }
                             )
@@ -98,6 +106,28 @@ struct StoredPhotosView: View {
                         .cornerRadius(12)
                     }
                     .padding()
+                    
+                    // Move Selected Folder Button
+                    if selectedFolderForMove != nil {
+                        Button(action: { 
+                            if let folder = selectedFolderForMove {
+                                moveFolder(folder)
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "icloud.and.arrow.up")
+                                Text("Move '\(selectedFolderForMove?.name ?? "")' to Google Drive")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(12)
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom)
+                    }
                 }
             }
             .navigationTitle("Stored Photos")
@@ -246,7 +276,8 @@ struct StoredPhotosView: View {
 
 struct FolderRowView: View {
     let folder: StoredFolder
-    let onMoveAll: () -> Void
+    let isSelected: Bool
+    let onTap: () -> Void
     let onViewPhotos: () -> Void
     let onDeleteFolder: () -> Void
     
@@ -285,12 +316,6 @@ struct FolderRowView: View {
                             .foregroundColor(.blue)
                     }
                     
-                    Button(action: onMoveAll) {
-                        Image(systemName: "icloud.and.arrow.up")
-                            .font(.title3)
-                            .foregroundColor(.green)
-                    }
-                    
                     Button(action: { showDeleteAlert = true }) {
                         Image(systemName: "trash")
                             .font(.title3)
@@ -300,6 +325,13 @@ struct FolderRowView: View {
             }
         }
         .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.blue.opacity(0.2) : Color.clear)
+        )
+        .onTapGesture {
+            onTap()
+        }
         .alert("Delete Folder", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
                 onDeleteFolder()
